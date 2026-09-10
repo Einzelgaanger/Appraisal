@@ -1,3 +1,10 @@
+﻿-- =============================================================================
+-- GHC PRODUCTION READY — PASTE THIS ENTIRE FILE ONCE in Supabase → SQL Editor
+-- Replaces the prior split migrations (identity / period fix / hardening / domains).
+-- Safe to re-run (CREATE OR REPLACE + idempotent upserts).
+-- Borrowed email path: boom_branded_email_html + boom_queue_transactional_email
+-- =============================================================================
+
 -- GHC production hardening: email notifications, release/ack flow, partner perms,
 -- login email resolution, directory manager fields, safer notification hrefs.
 
@@ -69,7 +76,7 @@ BEGIN
     );
     PERFORM public.boom_queue_transactional_email(
       _employee_id,
-      _title || ' · GreenHouse Capital',
+      _title || ' Â· GreenHouse Capital',
       html,
       'ghc_' || coalesce(_event_type, 'notice'),
       jsonb_build_object(
@@ -630,3 +637,220 @@ BEGIN
   RETURN rid;
 END;
 $$;
+-- Point Executive Team primary hostname at executive.vgg.app (keep appraisal as alias).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tenant_domains') THEN
+    INSERT INTO public.tenant_domains (tenant_id, hostname, is_primary) VALUES
+      ('11111111-1111-1111-1111-111111111110', 'executive.vgg.app', true),
+      ('11111111-1111-1111-1111-111111111110', 'appraisal.vgg.app', false),
+      ('11111111-1111-1111-1111-111111111110', 'executiveteam.vgg.app', false),
+      ('22222222-2222-2222-2222-222222222220', 'ghc.vgg.app', true)
+    ON CONFLICT (hostname) DO UPDATE
+    SET tenant_id = EXCLUDED.tenant_id,
+        is_primary = EXCLUDED.is_primary;
+
+    UPDATE public.tenant_domains
+    SET is_primary = false
+    WHERE tenant_id = '11111111-1111-1111-1111-111111111110'
+      AND hostname <> 'executive.vgg.app';
+
+    UPDATE public.tenant_domains
+    SET is_primary = true
+    WHERE hostname = 'executive.vgg.app';
+  END IF;
+END $$;
+-- ---------------------------------------------------------------------------
+-- 360 upsert (v_period) — fixes ambiguous period on peer reviews
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.ghc_upsert_360(_payload jsonb)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  me uuid := public.ghc_me();
+  rid uuid;
+  reviewee uuid := (_payload->>'reviewee_id')::uuid;
+  v_period text := _payload->>'period';
+  st text := COALESCE(_payload->>'status', 'draft');
+BEGIN
+  IF me IS NULL OR NOT public.ghc_is_active_member(me) THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+  IF reviewee = me THEN
+    RAISE EXCEPTION 'Cannot review yourself';
+  END IF;
+
+  INSERT INTO public.ghc_360_responses AS r (
+    id, reviewer_id, reviewee_id, period, status,
+    score_founders_lps, example_founders_lps,
+    score_curious, example_curious,
+    score_move_fast, example_move_fast,
+    score_overachievement, example_overachievement,
+    score_job_done, example_job_done,
+    did_well, additional_comments, submitted_at, updated_at
+  ) VALUES (
+    COALESCE((_payload->>'id')::uuid, gen_random_uuid()),
+    me, reviewee, v_period, st,
+    (_payload->>'score_founders_lps')::integer, _payload->>'example_founders_lps',
+    (_payload->>'score_curious')::integer, _payload->>'example_curious',
+    (_payload->>'score_move_fast')::integer, _payload->>'example_move_fast',
+    (_payload->>'score_overachievement')::integer, _payload->>'example_overachievement',
+    (_payload->>'score_job_done')::integer, _payload->>'example_job_done',
+    _payload->>'did_well', _payload->>'additional_comments',
+    CASE WHEN st = 'submitted' THEN now() ELSE NULL END,
+    now()
+  )
+  ON CONFLICT (reviewer_id, reviewee_id, period) DO UPDATE SET
+    status = EXCLUDED.status,
+    score_founders_lps = EXCLUDED.score_founders_lps,
+    example_founders_lps = EXCLUDED.example_founders_lps,
+    score_curious = EXCLUDED.score_curious,
+    example_curious = EXCLUDED.example_curious,
+    score_move_fast = EXCLUDED.score_move_fast,
+    example_move_fast = EXCLUDED.example_move_fast,
+    score_overachievement = EXCLUDED.score_overachievement,
+    example_overachievement = EXCLUDED.example_overachievement,
+    score_job_done = EXCLUDED.score_job_done,
+    example_job_done = EXCLUDED.example_job_done,
+    did_well = EXCLUDED.did_well,
+    additional_comments = EXCLUDED.additional_comments,
+    submitted_at = CASE WHEN EXCLUDED.status = 'submitted' THEN COALESCE(r.submitted_at, now()) ELSE r.submitted_at END,
+    updated_at = now()
+  RETURNING id INTO rid;
+
+  RETURN rid;
+END;
+$$;
+
+-- Discussion messages notify the other party (in-app + email via ghc_create_notification)
+CREATE OR REPLACE FUNCTION public.ghc_post_evaluation_discussion_message(_evaluation_id uuid, _body text)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  me uuid := public.ghc_me();
+  did uuid;
+  mid uuid;
+  eval public.ghc_quarterly_evaluations%ROWTYPE;
+  recipient uuid;
+  author_name text;
+BEGIN
+  SELECT * INTO eval FROM public.ghc_quarterly_evaluations WHERE id = _evaluation_id;
+  IF eval.id IS NULL THEN RAISE EXCEPTION 'Not found'; END IF;
+  IF eval.employee_id <> me AND eval.manager_id <> me AND NOT public.ghc_is_admin() THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  INSERT INTO public.ghc_evaluation_discussions (evaluation_id)
+  VALUES (_evaluation_id)
+  ON CONFLICT (evaluation_id) DO UPDATE SET evaluation_id = EXCLUDED.evaluation_id
+  RETURNING id INTO did;
+
+  SELECT id INTO did FROM public.ghc_evaluation_discussions WHERE evaluation_id = _evaluation_id;
+
+  INSERT INTO public.ghc_evaluation_discussion_messages (discussion_id, author_employee_id, body)
+  VALUES (did, me, trim(_body))
+  RETURNING id INTO mid;
+
+  SELECT name INTO author_name FROM public.employees WHERE id = me;
+  recipient := CASE WHEN me = eval.employee_id THEN eval.manager_id ELSE eval.employee_id END;
+  IF recipient IS NOT NULL AND recipient IS DISTINCT FROM me THEN
+    PERFORM public.ghc_create_notification(
+      recipient,
+      'evaluation_discussion',
+      'New evaluation discussion message',
+      coalesce(author_name, 'Someone') || ' posted on a quarterly evaluation discussion.',
+      '/hub?tenant=ghc&tab=survey&ghcTab=results',
+      eval.period
+    );
+  END IF;
+
+  RETURN mid;
+END;
+$$;
+
+-- Acknowledge: ensure manager gets email+in-app
+CREATE OR REPLACE FUNCTION public.ghc_acknowledge_evaluation(
+  _evaluation_id uuid,
+  _understanding text,
+  _employee_response text
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  me uuid := public.ghc_me();
+  eval public.ghc_quarterly_evaluations%ROWTYPE;
+BEGIN
+  SELECT * INTO eval FROM public.ghc_quarterly_evaluations WHERE id = _evaluation_id;
+  IF eval.id IS NULL THEN RAISE EXCEPTION 'Not found'; END IF;
+  IF eval.employee_id <> me AND NOT public.ghc_is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+
+  UPDATE public.ghc_quarterly_evaluations
+  SET employee_understanding = _understanding,
+      employee_response = _employee_response,
+      status = 'acknowledged',
+      acknowledged_at = now(),
+      updated_at = now()
+  WHERE id = _evaluation_id;
+
+  INSERT INTO public.ghc_evaluation_discussions (evaluation_id)
+  VALUES (_evaluation_id)
+  ON CONFLICT (evaluation_id) DO NOTHING;
+
+  PERFORM public.ghc_create_notification(
+    eval.manager_id, 'evaluation_acknowledged',
+    'Evaluation acknowledged',
+    'Your direct report acknowledged their quarterly evaluation.',
+    '/hub?tenant=ghc&tab=survey', eval.period
+  );
+
+  RETURN _evaluation_id;
+END;
+$$;
+
+-- Admin: list submitted evaluations for partner board (no UUID hunting)
+CREATE OR REPLACE FUNCTION public.ghc_admin_list_evaluations(_period_quarter text)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.ghc_is_admin() THEN
+    RAISE EXCEPTION 'Admin only';
+  END IF;
+
+  RETURN COALESCE((
+    SELECT jsonb_agg(row_to_json(t)::jsonb ORDER BY t.submitted_at DESC NULLS LAST)
+    FROM (
+      SELECT
+        q.id,
+        q.period,
+        q.status,
+        q.total_score,
+        q.total_pct,
+        q.band_rating,
+        q.submitted_at,
+        emp.name AS employee_name,
+        mgr.name AS manager_name
+      FROM public.ghc_quarterly_evaluations q
+      JOIN public.employees emp ON emp.id = q.employee_id
+      JOIN public.employees mgr ON mgr.id = q.manager_id
+      WHERE q.period = _period_quarter
+        AND q.status IN ('submitted', 'acknowledged')
+    ) t
+  ), '[]'::jsonb);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.ghc_upsert_360(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_upsert_monthly_review(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_upsert_quarterly_evaluation(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_acknowledge_evaluation(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_post_evaluation_discussion_message(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_admin_list_evaluations(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_upsert_partner_recommendation(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_release_period(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ghc_get_directory_status(text, text) TO authenticated;
+
+-- Visibility check
+SELECT id, name, email, ghc_appraisal_active, ghc_hierarchy_level, ghc_manager_id, ghc_secondary_manager_id
+FROM employees
+WHERE coalesce(ghc_appraisal_active, false)
+ORDER BY coalesce(ghc_hierarchy_level, 99), name;

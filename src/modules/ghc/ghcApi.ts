@@ -153,6 +153,24 @@ export async function ghcGetAdminSummary(quarter: string, month: string) {
   return data;
 }
 
+export async function ghcAdminListEvaluations(quarter: string) {
+  const { data, error } = await db.rpc('ghc_admin_list_evaluations', {
+    _period_quarter: quarter,
+  });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    period: string;
+    status: string;
+    total_score: number | null;
+    total_pct: number | null;
+    band_rating: number | null;
+    submitted_at: string | null;
+    employee_name: string | null;
+    manager_name: string | null;
+  }>;
+}
+
 export async function ghcCreateInAppNotification(payload: {
   employee_id: string;
   event_type: string;

@@ -10,8 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { computeGhcScore, GHC_EVAL_INDICATORS, GHC_SCALE_0_5 } from './ghcConstants';
-import { ghcGetQuarterlyEvaluation, ghcUpsertQuarterlyEvaluation, type GhcTaskRow } from './ghcApi';
+import { computeGhcScore, GHC_EVAL_INDICATORS, GHC_PARTNER_ACTIONS, GHC_SCALE_0_5 } from './ghcConstants';
+import {
+  ghcGetPartnerRecommendations,
+  ghcGetQuarterlyEvaluation,
+  ghcUpsertPartnerRecommendation,
+  ghcUpsertQuarterlyEvaluation,
+  type GhcTaskRow,
+} from './ghcApi';
 
 type Goal = { area: string; goal: string; indicator: string; timeline: string; reviewer: string };
 
@@ -59,6 +65,7 @@ export default function GhcQuarterlyEvaluationRunner({
     { area: '', goal: '', indicator: '', timeline: '', reviewer: '' },
     { area: '', goal: '', indicator: '', timeline: '', reviewer: '' },
   ]);
+  const [partnerNotes, setPartnerNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -83,6 +90,13 @@ export default function GhcQuarterlyEvaluationRunner({
       if (Array.isArray(row.improvement_goals) && row.improvement_goals.length) {
         setGoals(row.improvement_goals as Goal[]);
       }
+      void ghcGetPartnerRecommendations(row.id).then((rows) => {
+        const next: Record<string, string> = {};
+        for (const r of rows as Array<{ action_option: string; recommendation_by_manager?: string }>) {
+          next[r.action_option] = r.recommendation_by_manager ?? '';
+        }
+        setPartnerNotes(next);
+      });
     });
   }, [open, task.record_id]);
 
@@ -128,6 +142,16 @@ export default function GhcQuarterlyEvaluationRunner({
       }
       const id = await ghcUpsertQuarterlyEvaluation(payload);
       setRecordId(id);
+      for (const action of GHC_PARTNER_ACTIONS) {
+        const note = partnerNotes[action]?.trim();
+        if (note) {
+          await ghcUpsertPartnerRecommendation({
+            evaluation_id: id,
+            action_option: action,
+            recommendation_by_manager: note,
+          });
+        }
+      }
       toast.success(status === 'submitted' ? 'Evaluation submitted' : 'Draft saved');
       if (status === 'submitted') onSaved();
     } catch (e) {
@@ -222,6 +246,22 @@ export default function GhcQuarterlyEvaluationRunner({
                 <Input className="sm:col-span-2" placeholder="Reviewer" value={g.reviewer} onChange={(e) => {
                   const next = [...goals]; next[i] = { ...g, reviewer: e.target.value }; setGoals(next);
                 }} />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <Label>Manager recommendations (for Partners / HR)</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Optional notes against each partner action. HR finalises Partners decisions in Monitor.
+            </p>
+            {GHC_PARTNER_ACTIONS.map((action) => (
+              <div key={action} className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">{action}</Label>
+                <Input
+                  value={partnerNotes[action] || ''}
+                  placeholder="Your recommendation / rationale"
+                  onChange={(e) => setPartnerNotes((prev) => ({ ...prev, [action]: e.target.value }))}
+                />
               </div>
             ))}
           </div>

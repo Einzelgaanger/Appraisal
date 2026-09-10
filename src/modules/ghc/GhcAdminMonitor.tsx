@@ -5,16 +5,12 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import {
+  ghcAdminListEvaluations,
   ghcGetAdminSummary,
-  ghcGetDirectory,
   ghcReleasePeriod,
   ghcUpsertPartnerRecommendation,
 } from './ghcApi';
 import { GHC_PARTNER_ACTIONS } from './ghcConstants';
-import { supabase } from '@/integrations/supabase/client';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any;
 
 export default function GhcAdminMonitor({
   periodQuarter,
@@ -24,6 +20,14 @@ export default function GhcAdminMonitor({
   periodMonth: string;
 }) {
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
+  const [evals, setEvals] = useState<Array<{
+    id: string;
+    status: string;
+    total_score: number | null;
+    total_pct: number | null;
+    employee_name: string | null;
+    manager_name: string | null;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [evalId, setEvalId] = useState('');
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
@@ -31,11 +35,13 @@ export default function GhcAdminMonitor({
   const refresh = async () => {
     setLoading(true);
     try {
-      const [s] = await Promise.all([
+      const [s, list] = await Promise.all([
         ghcGetAdminSummary(periodQuarter, periodMonth),
-        ghcGetDirectory(periodQuarter, periodMonth),
+        ghcAdminListEvaluations(periodQuarter).catch(() => []),
       ]);
       setSummary(s as Record<string, number>);
+      setEvals(list);
+      if (!evalId && list[0]?.id) setEvalId(list[0].id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Admin summary failed');
     } finally {
@@ -55,29 +61,6 @@ export default function GhcAdminMonitor({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Release failed');
     }
-  };
-
-  const loadLatestEval = async () => {
-    const { data, error } = await db
-      .from('ghc_quarterly_evaluations')
-      .select('id, period, status, employees!ghc_quarterly_evaluations_employee_id_fkey(name)')
-      .eq('period', periodQuarter)
-      .order('submitted_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      // fallback without join
-      const { data: row } = await db
-        .from('ghc_quarterly_evaluations')
-        .select('id')
-        .eq('period', periodQuarter)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (row?.id) setEvalId(row.id);
-      return;
-    }
-    if (data?.id) setEvalId(data.id);
   };
 
   const savePartner = async (action: string) => {
@@ -136,12 +119,34 @@ export default function GhcAdminMonitor({
       </div>
 
       <div className="glass-panel p-5 space-y-3">
-        <div className="flex flex-wrap items-center gap-2 justify-between">
-          <h3 className="text-sm font-semibold">Partners recommendation board</h3>
-          <Button size="sm" variant="outline" onClick={() => void loadLatestEval()}>Load latest eval id</Button>
-        </div>
+        <h3 className="text-sm font-semibold">Submitted evaluations ({periodQuarter})</h3>
+        {evals.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No submitted evaluations yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {evals.map((ev) => (
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => setEvalId(ev.id)}
+                className={`flex w-full flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs ${
+                  evalId === ev.id ? 'border-primary bg-primary/5' : 'border-border/50'
+                }`}
+              >
+                <span className="font-medium">{ev.employee_name}</span>
+                <span className="text-muted-foreground">via {ev.manager_name}</span>
+                <Badge variant="outline" className="text-[10px]">{ev.status}</Badge>
+                <Badge variant="secondary" className="text-[10px]">{ev.total_score ?? '—'}/35</Badge>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Partners recommendation board</h3>
         <Input
-          placeholder="Evaluation UUID"
+          placeholder="Evaluation UUID (auto-filled when you pick a row above)"
           value={evalId}
           onChange={(e) => setEvalId(e.target.value)}
           className="font-mono text-xs"
