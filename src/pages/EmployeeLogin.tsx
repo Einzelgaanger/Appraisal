@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import vggLogo from '@/assets/vgg-logo.webp';
+import { useTenant } from '@/tenants/TenantContext';
 
 export default function EmployeeLogin() {
+  const { tenant } = useTenant();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -90,9 +92,7 @@ export default function EmployeeLogin() {
                   Welcome back.
                 </h1>
                 <p className="mt-2 text-[13px] text-foreground/60 sm:text-sm leading-relaxed">
-                  Executive Office BOOM workspace — after sign-in you&apos;ll open the hub:{' '}
-                  <span className="text-foreground/75">Survey</span> (peer 360, EPA, monthly),{' '}
-                  <span className="text-foreground/75">Dashboard</span>, Growth, and Rankings. Secure employee access only.
+                  {tenant.branding.workspaceLabel} - after sign-in you&apos;ll open your appraisal hub with tasks, dashboard, and growth tools based on your role. Secure employee access only.
                 </p>
               </div>
 

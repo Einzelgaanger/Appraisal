@@ -20,13 +20,15 @@ import { toast } from 'sonner';
 import { AppraisalAdminSkeleton } from '@/components/shell/LoadingShells';
 import AdminMobileTabBar from '@/components/AdminMobileTabBar';
 import { ENABLE_APP_AI } from '@/lib/featureFlags';
-import { defaultQuarterPeriod, quarterOptions } from '@/lib/boomPeriods';
-import { EO_PILOT_ONLY, EO_SUBSIDIARY_ID } from '@/lib/eoPilot';
+import { defaultQuarterPeriod, defaultMonthPeriod, quarterOptions } from '@/lib/boomPeriods';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
 } from 'recharts';
+import { isBoomTenant, isGhcTenant } from '@/tenants/config';
+import { useTenant } from '@/tenants/TenantContext';
+import GhcAdminMonitor from '@/modules/ghc/GhcAdminMonitor';
 
 interface ResponseRow { id: string; employee_id: string; subsidiary_id: string; created_at: string; }
 interface AnswerRow { id: string; response_id: string; question_id: string; score: number | null; text_answer: string | null; }
@@ -81,6 +83,7 @@ const CHART_COLORS = [
 export default function AppraisalAdmin() {
   const { logout: legacyLogout } = useAuth();
   const { logout: employeeLogout } = useEmployeeAuth();
+  const { tenant } = useTenant();
   const navigate = useNavigate();
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [answers, setAnswers] = useState<AnswerRow[]>([]);
@@ -94,7 +97,9 @@ export default function AppraisalAdmin() {
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [adminTab, setAdminTab] = useState(EO_PILOT_ONLY ? 'boom' : 'overview');
+  const boomMode = isBoomTenant(tenant);
+  const ghcMode = isGhcTenant(tenant);
+  const [adminTab, setAdminTab] = useState(boomMode || ghcMode ? 'boom' : 'overview');
   const [boomResponses, setBoomResponses] = useState<BoomResponseRow[]>([]);
   const [boomAnswers, setBoomAnswers] = useState<BoomAnswerRow[]>([]);
   const [boomForms, setBoomForms] = useState<BoomFormRow[]>([]);
@@ -501,7 +506,7 @@ export default function AppraisalAdmin() {
 
   // AI data context
   const dataContext = useMemo(() => {
-    if (EO_PILOT_ONLY) {
+    if (boomMode) {
       const submitted = boomResponses.filter((r) => r.status === 'submitted');
       const byForm: Record<string, number> = {};
       for (const r of submitted) {
@@ -576,7 +581,7 @@ ${deptData}
 
 SAMPLE QUALITATIVE FEEDBACK:
 ${feedbackSample || '• No text feedback yet'}`;
-  }, [EO_PILOT_ONLY, boomResponses, boomAnswers, boomForms, employees, responses, employeeLeaderboard, categoryAverages, subsidiaryBreakdown, departmentBreakdown, answers, totalResponses, uniqueReviewees, totalEmployees, participationRate, avgOverallScore]);
+  }, [boomMode, boomResponses, boomAnswers, boomForms, employees, responses, employeeLeaderboard, categoryAverages, subsidiaryBreakdown, departmentBreakdown, answers, totalResponses, uniqueReviewees, totalEmployees, participationRate, avgOverallScore]);
 
   const boomSubmittedCount = useMemo(
     () => filteredBoomResponses.filter((r) => r.status === 'submitted').length,
@@ -608,27 +613,59 @@ ${feedbackSample || '• No text feedback yet'}`;
     return <AppraisalAdminSkeleton />;
   }
 
+  if (ghcMode) {
+    return (
+      <div className="app-page">
+        <div className="app-page-grid" />
+        <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-xl">
+          <div className="platform-canvas py-3 sm:py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/hub?tab=survey')} className="gap-1 flex-shrink-0 self-start sm:self-auto">
+                <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Hub</span>
+              </Button>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold text-primary">GHC Appraisal Monitor</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">GreenHouse Capital completion, releases, and partner actions</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+              <span className="text-xs">Sign Out</span>
+            </Button>
+          </div>
+        </header>
+        <main className="platform-content section-stack has-admin-mobile-nav">
+          <GhcAdminMonitor periodQuarter={defaultQuarterPeriod()} periodMonth={defaultMonthPeriod()} />
+        </main>
+        <AdminMobileTabBar
+          onOpenCopilot={() => setChatOpen(true)}
+          onSignOut={() => void handleLogout()}
+          onRefresh={() => loadAllData()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app-page">
       <div className="app-page-grid" />
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
         <div className="platform-canvas py-3 sm:py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate(EO_PILOT_ONLY ? '/hub?tab=survey' : '/dashboard')} className="gap-1 flex-shrink-0 self-start sm:self-auto">
-              <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{EO_PILOT_ONLY ? 'Hub' : 'Dashboard'}</span><span className="sm:hidden">Back</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate(boomMode ? '/hub?tab=survey' : '/dashboard')} className="gap-1 flex-shrink-0 self-start sm:self-auto">
+              <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{boomMode ? 'Hub' : 'Dashboard'}</span><span className="sm:hidden">Back</span>
             </Button>
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold text-primary flex flex-wrap items-center gap-2">
-                <span className="truncate">{EO_PILOT_ONLY ? 'EO Appraisal Monitor' : '360° Appraisal Monitor'}</span>
-                {(EO_PILOT_ONLY ? boomSubmittedCount > 0 : totalResponses > 0) && (
+                <span className="truncate">{boomMode ? `${tenant.branding.shortName} Appraisal Monitor` : '360° Appraisal Monitor'}</span>
+                {(boomMode ? boomSubmittedCount > 0 : totalResponses > 0) && (
                   <Badge variant="secondary" className="text-[10px] gap-1 shrink-0">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Live
                   </Badge>
                 )}
               </h1>
               <p className="text-xs text-muted-foreground hidden sm:block">
-                {EO_PILOT_ONLY
-                  ? 'Executive Office BOOM completion tracking & analytics'
+                {boomMode
+                  ? `${tenant.branding.fullName} completion tracking & analytics`
                   : 'Real-time response tracking & analytics'}
               </p>
             </div>
@@ -651,7 +688,7 @@ ${feedbackSample || '• No text feedback yet'}`;
 
       <main className="platform-content section-stack has-admin-mobile-nav">
         {/* Filters — legacy multi-subsidiary only */}
-        {!EO_PILOT_ONLY && (
+        {!boomMode && (
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
           <Select value={selectedSubsidiary} onValueChange={v => { setSelectedSubsidiary(v); setSelectedEmployee(null); }}>
             <SelectTrigger className="w-full sm:w-[200px] bg-secondary/50">
@@ -678,12 +715,12 @@ ${feedbackSample || '• No text feedback yet'}`;
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {(EO_PILOT_ONLY
+          {(boomMode
             ? [
                 { label: 'Submitted', value: boomSubmittedCount, icon: ClipboardCheck, color: 'bg-primary/10 text-primary' },
                 { label: 'People reviewed', value: boomUniqueReviewees, icon: Users, color: 'bg-accent/10 text-accent' },
                 { label: 'Reviewers active', value: boomUniqueReviewers, icon: Target, color: 'bg-muted text-foreground' },
-                { label: 'EO roster', value: employees.filter((e) => e.subsidiary_id === EO_SUBSIDIARY_ID).length || employees.length, icon: Activity, color: 'bg-success/10 text-success' },
+                { label: `${tenant.branding.shortName} roster`, value: tenant.subsidiaryId ? employees.filter((e) => e.subsidiary_id === tenant.subsidiaryId).length || employees.length : employees.length, icon: Activity, color: 'bg-success/10 text-success' },
               ]
             : [
                 { label: 'Total Responses', value: totalResponses, icon: ClipboardCheck, color: 'bg-primary/10 text-primary' },
@@ -703,13 +740,13 @@ ${feedbackSample || '• No text feedback yet'}`;
           ))}
         </div>
 
-        {(EO_PILOT_ONLY ? boomResponses.length === 0 : totalResponses === 0 && boomResponses.length === 0) ? (
+        {(boomMode ? boomResponses.length === 0 : totalResponses === 0 && boomResponses.length === 0) ? (
           <div className="glass-panel p-12 text-center">
             <ClipboardCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No responses yet</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              {EO_PILOT_ONLY
-                ? 'BOOM assessments appear here as the EO team submits monthly self, peer 360, and EA quarterly forms.'
+              {boomMode
+                ? `${tenant.branding.shortName} assessments appear here as people submit monthly self, peer 360, and manager/leadership forms.`
                 : 'Share the hub link for legacy subsidiary surveys, or complete BOOM assessments from the employee hub.'}
             </p>
             <Button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/hub'); }} className="bg-primary hover:bg-primary/90">
@@ -718,7 +755,7 @@ ${feedbackSample || '• No text feedback yet'}`;
           </div>
         ) : (
           <Tabs value={adminTab} onValueChange={setAdminTab}>
-            {!EO_PILOT_ONLY && (
+            {!boomMode && (
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 min-h-11 h-auto gap-1 py-1">
                   <TabsTrigger value="overview" className="text-xs gap-1.5"><BarChart3 className="w-3 h-3" /> Overview</TabsTrigger>
                   <TabsTrigger value="people" className="text-xs gap-1.5"><Users className="w-3 h-3" /> People</TabsTrigger>
@@ -993,7 +1030,7 @@ ${feedbackSample || '• No text feedback yet'}`;
 
             {/* ===== BOOM ASSESSMENTS TAB ===== */}
             <TabsContent value="boom" className="mt-4 space-y-4">
-              {!EO_PILOT_ONLY && (
+              {!boomMode && (
               <div className="glass-panel p-5 border-amber-500/20 bg-amber-500/[0.03]">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
@@ -1102,7 +1139,7 @@ ${feedbackSample || '• No text feedback yet'}`;
               </div>
               )}
 
-              {!EO_PILOT_ONLY && (
+              {!boomMode && (
               <div className="glass-panel p-5 border-primary/15 space-y-6">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">

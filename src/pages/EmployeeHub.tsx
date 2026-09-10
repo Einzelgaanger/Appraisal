@@ -38,6 +38,9 @@ import {
 } from '@/components/shell/LoadingShells';
 import BoomReviewHub from '@/components/boom/BoomReviewHub';
 import BoomNotificationsBell from '@/components/boom/BoomNotificationsBell';
+import GhcReviewHub from '@/modules/ghc/GhcReviewHub';
+import GhcNotificationsBell from '@/modules/ghc/GhcNotificationsBell';
+import GhcMyResults from '@/modules/ghc/GhcMyResults';
 import {
   displayHierarchyLabel,
   getSurveyFeedbackDirection,
@@ -46,9 +49,10 @@ import {
 import { defaultQuarterPeriod } from '@/lib/boomPeriods';
 import { fetchMyAggregatedPeer360Scores, fetchMy360Dashboard, fetchOrgPerformanceRankings, fetchGrowthHubPulse, buildBoomGrowthAiContext, type GrowthHubPulseMode } from '@/lib/boomDashboard360';
 import { fetchMyEaQuarterlyResults, type EaQuarterlyResults } from '@/lib/boomEaQuarterly';
-import { EO_PILOT_ONLY, EO_SUBSIDIARY_ID } from '@/lib/eoPilot';
 import { isMeaningfulQualitativeAnswer } from '@/lib/qualitativeFeedback';
 import EaQuarterlyDashboardCard from '@/components/employee-dashboard/EaQuarterlyDashboardCard';
+import { isBoomTenant, isGhcTenant } from '@/tenants/config';
+import { useTenant } from '@/tenants/TenantContext';
 
 interface FeedbackItem {
   text: string;
@@ -81,9 +85,14 @@ const pageTransition = {
 
 export default function EmployeeHub() {
   const { user, profile, isAdmin, logout } = useEmployeeAuth();
+  const { tenant } = useTenant();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'survey';
+  const showRankings = tenant.capabilities.showRankings;
+  const showGrowthHub = tenant.capabilities.showGrowthHub;
+  const boomMode = isBoomTenant(tenant);
+  const ghcMode = isGhcTenant(tenant);
 
   // Survey state
   const [step, setStep] = useState<'subsidiary' | 'employee' | 'questions' | 'submitted'>('subsidiary');
@@ -188,6 +197,10 @@ export default function EmployeeHub() {
 
   // Load dashboard data
   useEffect(() => {
+    if (ghcMode) {
+      setDashboardLoading(false);
+      return;
+    }
     if (activeTab !== 'dashboard' && activeTab !== 'growth') return;
 
     if (!user) {
@@ -207,7 +220,8 @@ export default function EmployeeHub() {
     }
 
     void loadDashboardData(currentEmployee.id);
-  }, [activeTab, currentEmployee?.id, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDashboardData closes over many hub fields
+  }, [activeTab, currentEmployee?.id, user, ghcMode]);
 
   const loadDashboardData = async (employeeId: string) => {
     if (!user) return;
@@ -219,7 +233,7 @@ export default function EmployeeHub() {
     try {
       const q = defaultQuarterPeriod();
 
-      if (EO_PILOT_ONLY) {
+      if (boomMode) {
         const eaResults = await fetchMyEaQuarterlyResults(q);
         if (eaResults?.submissionCount) setEaQuarterlyResults(eaResults);
 
@@ -898,10 +912,10 @@ export default function EmployeeHub() {
   };
 
   useEffect(() => {
-    if (EO_PILOT_ONLY && activeTab === 'rankings') {
+    if (!showRankings && activeTab === 'rankings') {
       setTab('survey');
     }
-  }, [activeTab]);
+  }, [activeTab, showRankings]);
 
   const handleLogout = async () => { await logout(); navigate('/'); };
 
@@ -928,7 +942,7 @@ export default function EmployeeHub() {
       {/* Desktop sidebar (hidden on mobile via component) */}
       <PlatformSidebar
         suppressMobileHeader
-        title="360° Appraisal"
+        title={tenant.branding.workspaceLabel}
         subtitle={profile?.name}
         meta={[
           { label: 'Subsidiary', value: currentEmployeeSubsidiary ?? 'Unlisted' },
@@ -946,13 +960,13 @@ export default function EmployeeHub() {
             active: activeTab === 'growth',
             onClick: () => setTab('growth')
           },
-          ...(!EO_PILOT_ONLY
+          ...(showRankings
             ? [{ key: 'rankings', label: 'Rankings', icon: <Trophy className="w-4 h-4" />, active: activeTab === 'rankings', onClick: () => setTab('rankings') }]
             : []),
         ]}
         actions={
           <>
-            <BoomNotificationsBell />
+            {ghcMode ? <GhcNotificationsBell /> : <BoomNotificationsBell />}
             {isAdmin && (
               <Button variant="outline" size="sm" asChild className="w-full gap-2 border-primary/30 text-primary">
                 <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin</Link>
@@ -977,14 +991,14 @@ export default function EmployeeHub() {
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
               ◉ {activeTab === 'survey' ? 'Appraisal'
                   : activeTab === 'dashboard' ? 'My Dashboard'
-                  : activeTab === 'growth' ? 'Growth Hub'
+                  : activeTab === 'growth' && showGrowthHub ? 'Growth Hub'
                   : activeTab === 'rankings' ? 'Rankings'
                   : activeTab === 'profile' ? 'Profile'
                   : 'Appraisal'}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <BoomNotificationsBell compact />
+            {ghcMode ? <GhcNotificationsBell compact /> : <BoomNotificationsBell compact />}
             {isAdmin && (
               <Link to="/appraisal" aria-label="Admin" className="text-muted-foreground hover:text-primary p-2">
                 <Shield className="w-4 h-4" />
@@ -1000,19 +1014,34 @@ export default function EmployeeHub() {
         <Tabs value={activeTab} onValueChange={setTab}>
           {/* ============ SURVEY TAB ============ */}
           <TabsContent value="survey" className="mt-4">
-            <BoomReviewHub
-              reviewerEmployeeId={currentEmployee?.id ?? null}
-              reviewerHierarchyLevel={currentEmployee?.hierarchy_level ?? profile?.hierarchy_level ?? null}
-              reviewerName={currentEmployee?.name ?? profile?.name ?? null}
-              reviewerRole={currentEmployee?.role ?? profile?.role ?? null}
-              reviewerDepartment={currentEmployee?.department ?? profile?.department ?? null}
-              reviewerEmail={profile?.email ?? user?.email ?? null}
-              isPlatformAdmin={isAdmin}
-            />
+            {ghcMode ? (
+              <GhcReviewHub
+                employeeId={currentEmployee?.id ?? null}
+                employeeName={currentEmployee?.name ?? profile?.name ?? null}
+                isPlatformAdmin={isAdmin}
+              />
+            ) : (
+              <BoomReviewHub
+                reviewerEmployeeId={currentEmployee?.id ?? null}
+                reviewerHierarchyLevel={currentEmployee?.hierarchy_level ?? profile?.hierarchy_level ?? null}
+                reviewerName={currentEmployee?.name ?? profile?.name ?? null}
+                reviewerRole={currentEmployee?.role ?? profile?.role ?? null}
+                reviewerDepartment={currentEmployee?.department ?? profile?.department ?? null}
+                reviewerEmail={profile?.email ?? user?.email ?? null}
+                isPlatformAdmin={isAdmin}
+              />
+            )}
           </TabsContent>
 
           {/* ============ DASHBOARD TAB ============ */}
           <TabsContent value="dashboard" className="mt-4">
+            {ghcMode ? (
+              <GhcMyResults
+                periodQuarter={defaultQuarterPeriod()}
+                acknowledgeTask={null}
+                onAcknowledged={() => undefined}
+              />
+            ) : (
             <motion.div {...pageTransition}>
               {dashboardLoading ? (
                 <EmployeeDashboardTabSkeleton />
@@ -1331,10 +1360,20 @@ export default function EmployeeHub() {
                 </motion.div>
               )}
             </motion.div>
+            )}
           </TabsContent>
 
           {/* ============ GROWTH HUB TAB ============ */}
           <TabsContent value="growth" className="mt-4">
+            {ghcMode ? (
+              <div className="glass-panel p-6 space-y-3">
+                <h3 className="text-sm font-semibold">GHC growth focus</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Use quarterly evaluation improvement goals and culture radar from My results. Manager monthly reviews
+                  capture OKR and fulfilment signals each month.
+                </p>
+              </div>
+            ) : (
             <motion.div {...pageTransition}>
               {dashboardLoading ? (
                 <div className="flex items-center justify-center py-20">
@@ -1427,9 +1466,10 @@ export default function EmployeeHub() {
                 </div>
               )}
             </motion.div>
+            )}
           </TabsContent>
 
-          {!EO_PILOT_ONLY && (
+          {showRankings && (
           <TabsContent value="rankings" className="mt-4">
             <motion.div {...pageTransition}>
               {rankingsLoading ? (

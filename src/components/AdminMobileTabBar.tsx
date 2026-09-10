@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { EO_PILOT_ONLY } from '@/lib/eoPilot';
 import { BarChart3, ClipboardList, Brain, MoreHorizontal, RefreshCw, LogOut, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +10,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { useTenant } from '@/tenants/TenantContext';
 
 type AdminMobileTabBarProps = {
   onOpenCopilot: () => void;
@@ -27,6 +27,8 @@ const tabInner = 'relative flex w-full flex-col items-center justify-center gap-
 export default function AdminMobileTabBar({ onOpenCopilot, onSignOut, onRefresh }: AdminMobileTabBarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const showLegacyDashboard = tenant.capabilities.showLegacyDashboard;
 
   return (
     <nav
@@ -37,7 +39,7 @@ export default function AdminMobileTabBar({ onOpenCopilot, onSignOut, onRefresh 
       <ul className="grid grid-cols-4">
         <li>
           <NavLink
-            to={EO_PILOT_ONLY ? '/hub?tab=survey' : '/dashboard'}
+            to={showLegacyDashboard ? '/dashboard' : '/hub?tab=survey'}
             end
             onClick={() => setMoreOpen(false)}
             className={({ isActive }) =>
@@ -54,7 +56,7 @@ export default function AdminMobileTabBar({ onOpenCopilot, onSignOut, onRefresh 
                 )}
                 <BarChart3 className={cn('h-5 w-5', isActive && 'stroke-[2.25]')} />
                 <span className="text-[10px] font-medium tracking-wide font-mono uppercase">
-                  {EO_PILOT_ONLY ? 'Hub' : 'Overview'}
+                  {showLegacyDashboard ? 'Overview' : 'Hub'}
                 </span>
               </span>
             )}

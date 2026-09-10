@@ -18,6 +18,7 @@ import {
 import vggLogo from '@/assets/vgg-logo.webp';
 import heroHub from '@/assets/hero-hub.jpg';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
+import { useTenant } from '@/tenants/TenantContext';
 
 interface Subsidiary { id: string; name: string; hierarchy_lower_is_senior?: boolean; }
 interface EmployeeOption {
@@ -40,6 +41,7 @@ const uniqueSorted = (values: Array<string | null | undefined>) =>
 
 export default function ProfileCompletionGate({ children }: { children: ReactNode }) {
   const { user, profile, refreshProfile, logout } = useEmployeeAuth();
+  const { tenant } = useTenant();
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [name, setName] = useState(profile?.name ?? '');
@@ -142,7 +144,7 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
           <div className="absolute inset-0 bg-background/20" />
           <div className="absolute bottom-8 left-8 right-8 border border-border bg-background/90 p-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">◉ Employee record</p>
-            <h1 className="mt-3 max-w-xl font-display text-5xl font-medium leading-none">Complete your profile before appraisals.</h1>
+            <h1 className="mt-3 max-w-xl font-display text-5xl font-medium leading-none">Complete your profile before entering {tenant.branding.shortName} appraisal.</h1>
           </div>
         </section>
 
@@ -165,7 +167,7 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Required step</p>
                   <h2 className="mt-1 font-display text-2xl font-medium">Confirm your employee details</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">This places you correctly in the review pools and keeps reporting complete.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">This places you correctly in the right tenant, review pools, and reporting lines.</p>
                 </div>
               </div>
 

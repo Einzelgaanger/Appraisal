@@ -1,5 +1,5 @@
 import { ClipboardList, BarChart3, User } from 'lucide-react';
-import { EO_PILOT_ONLY } from '@/lib/eoPilot';
+import { useTenant } from '@/tenants/TenantContext';
 
 export type MobileTab = 'survey' | 'dashboard' | 'growth' | 'rankings' | 'profile';
 
@@ -16,13 +16,13 @@ const ALL_TABS: { key: MobileTab; label: string; icon: React.ComponentType<{ cla
   { key: 'profile', label: 'Profile', icon: User, pilot: true },
 ];
 
-const TABS = EO_PILOT_ONLY ? ALL_TABS.filter((t) => t.pilot) : ALL_TABS;
-
 /**
  * WhatsApp-style fixed bottom tab bar — mobile only (hidden on lg+).
  */
 export default function MobileTabBar({ active, onChange }: MobileTabBarProps) {
-  const cols = TABS.length;
+  const { tenant } = useTenant();
+  const tabs = tenant.capabilities.showRankings ? ALL_TABS : ALL_TABS.filter((t) => t.pilot);
+  const cols = tabs.length;
   return (
     <nav
       aria-label="Primary"
@@ -30,7 +30,7 @@ export default function MobileTabBar({ active, onChange }: MobileTabBarProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className={`grid grid-cols-${cols}`} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-        {TABS.map(({ key, label, icon: Icon }) => {
+        {tabs.map(({ key, label, icon: Icon }) => {
           const isActive = active === key;
           return (
             <li key={key}>

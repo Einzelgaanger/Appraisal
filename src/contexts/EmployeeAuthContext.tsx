@@ -163,7 +163,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    const siteUrl = import.meta.env.PROD ? 'https://appraisal.vgg.app' : window.location.origin;
+    const siteUrl = window.location.origin;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${siteUrl}/reset-password`,
     });

@@ -21,7 +21,7 @@ import Docs from "./pages/Docs";
 import MvpDemo from "./pages/MvpDemo";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 import { AppBootstrapSkeleton } from "@/components/shell/LoadingShells";
-import { EO_PILOT_ONLY } from "@/lib/eoPilot";
+import { TenantProvider, useTenant } from "@/tenants/TenantContext";
 
 const queryClient = new QueryClient();
 
@@ -60,8 +60,11 @@ function EmployeeLoginRedirect() {
 function AdminGate() {
   const { isAuthenticated: isLegacyAdmin } = useAuth();
   const { isAuthenticated: isEmployee, isAdmin, isLoading } = useEmployeeAuth();
+  const { tenant } = useTenant();
   if (isLoading) return <AppBootstrapSkeleton />;
-  if (isLegacyAdmin || (isEmployee && isAdmin)) return <Navigate to={EO_PILOT_ONLY ? "/appraisal" : "/dashboard"} replace />;
+  if (isLegacyAdmin || (isEmployee && isAdmin)) {
+    return <Navigate to={tenant.capabilities.showLegacyDashboard ? "/dashboard" : "/appraisal"} replace />;
+  }
   return <Login />;
 }
 
@@ -78,6 +81,11 @@ function LoginRoute() {
 }
 
 function AppRoutes() {
+  const { tenant } = useTenant();
+  const showLegacyDashboard = tenant.capabilities.showLegacyDashboard;
+  const showRankings = tenant.capabilities.showRankings;
+  const showDemoRoute = tenant.capabilities.showDemoRoute;
+
   return (
     <Routes>
       <Route path="/omotola" element={<Navigate to="/hub?tab=survey" replace />} />
@@ -93,12 +101,12 @@ function AppRoutes() {
       {/* Legacy routes redirect to hub */}
       <Route path="/survey" element={<Navigate to="/hub?tab=survey" replace />} />
       <Route path="/my-dashboard" element={<Navigate to="/hub?tab=dashboard" replace />} />
-      <Route path="/wall-of-fame" element={<Navigate to={EO_PILOT_ONLY ? "/hub?tab=survey" : "/hub?tab=rankings"} replace />} />
+      <Route path="/wall-of-fame" element={<Navigate to={showRankings ? "/hub?tab=rankings" : "/hub?tab=survey"} replace />} />
       <Route path="/admin" element={<AdminGate />} />
       <Route
         path="/dashboard"
         element={
-          EO_PILOT_ONLY ? (
+          !showLegacyDashboard ? (
             <ProtectedAdminRoute><Navigate to="/appraisal" replace /></ProtectedAdminRoute>
           ) : (
             <ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>
@@ -106,7 +114,7 @@ function AppRoutes() {
         }
       />
       <Route path="/appraisal" element={<ProtectedAdminRoute><AppraisalAdmin /></ProtectedAdminRoute>} />
-      <Route path="/demo" element={EO_PILOT_ONLY ? <Navigate to="/login" replace /> : <DemoDashboard />} />
+      <Route path="/demo" element={showDemoRoute ? <DemoDashboard /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -124,11 +132,13 @@ const App = () => (
             v7_relativeSplatPath: true,
           }}
         >
-          <EmployeeAuthProvider>
-            <AuthProvider>
-              <AppRoutes />
-            </AuthProvider>
-          </EmployeeAuthProvider>
+          <TenantProvider>
+            <EmployeeAuthProvider>
+              <AuthProvider>
+                <AppRoutes />
+              </AuthProvider>
+            </EmployeeAuthProvider>
+          </TenantProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

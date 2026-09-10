@@ -18,7 +18,6 @@ import BoomInsightsPanel from './BoomInsightsPanel';
 import BoomDiscussionsPanel from './BoomDiscussionsPanel';
 import { toast } from 'sonner';
 import { boomFormPurpose, boomHierarchyLabel, boomPeerFormHint, boomTasksIntro } from '@/lib/boomRoleLabels';
-import { isEoTeamMember } from '@/lib/eoPilot';
 import {
   quarterOptions,
   monthOptions,
@@ -29,6 +28,8 @@ import { fetchMy360Dashboard, type Boom360DashboardState } from '@/lib/boomDashb
 import QualitativeFeedback from '@/components/employee-dashboard/QualitativeFeedback';
 import AssessmentRunner from './AssessmentRunner';
 import ExecutiveAssessorRunner from './ExecutiveAssessorRunner';
+import { isTenantTeamMember } from '@/tenants/config';
+import { useTenant } from '@/tenants/TenantContext';
 import {
   ResponsiveContainer,
   BarChart,
@@ -100,6 +101,7 @@ export default function BoomReviewHub({
   reviewerEmail,
   isPlatformAdmin = false,
 }: BoomReviewHubProps) {
+  const { tenant } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialBoomTab = searchParams.get('boomTab');
   const periodQuarter = resolveQuarterPeriod(searchParams.get('boomQuarter'));
@@ -140,7 +142,7 @@ export default function BoomReviewHub({
   );
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AssignmentRow[]>([]);
-  const teamMemberView = isEoTeamMember(reviewerHierarchyLevel);
+  const teamMemberView = isTenantTeamMember(tenant, reviewerHierarchyLevel);
   const [dashboard360, setDashboard360] = useState<Boom360DashboardState | null>(null);
   const [loading360, setLoading360] = useState(false);
 
@@ -248,7 +250,9 @@ export default function BoomReviewHub({
     return m;
   }, [rows]);
 
-  const showCommentsTab = givesComments || receivesComments;
+  const showCommentsTab = tenant.capabilities.showComments && (givesComments || receivesComments);
+  const canViewDirectory = tenant.capabilities.showDirectoryInsights && (isPlatformAdmin || (reviewerHierarchyLevel !== null && reviewerHierarchyLevel <= 1));
+  const canViewInsights = tenant.capabilities.showDirectoryInsights && (isPlatformAdmin || reviewerHierarchyLevel === 0);
 
   const hasOwnMonthlySelf = useMemo(
     () =>
@@ -477,12 +481,12 @@ export default function BoomReviewHub({
               <MessageSquare className="w-3 h-3" /> Comments
             </TabsTrigger>
           )}
-          {(isPlatformAdmin || (reviewerHierarchyLevel !== null && reviewerHierarchyLevel <= 1)) && (
+          {canViewDirectory && (
             <TabsTrigger value="directory" className="text-xs gap-1">
               <Users className="w-3 h-3" /> Directory
             </TabsTrigger>
           )}
-          {(isPlatformAdmin || reviewerHierarchyLevel === 0) && (
+          {canViewInsights && (
             <TabsTrigger value="insights" className="text-xs gap-1">
               <LayoutDashboard className="w-3 h-3" /> Insights
             </TabsTrigger>
@@ -727,6 +731,7 @@ export default function BoomReviewHub({
         </TabsContent>
         )}
 
+        {canViewDirectory && (
         <TabsContent value="directory" className="mt-0">
           <BoomDirectoryPanel
             viewerHierarchyLevel={reviewerHierarchyLevel}
@@ -735,7 +740,9 @@ export default function BoomReviewHub({
             periodMonth={periodMonth}
           />
         </TabsContent>
+        )}
 
+        {canViewInsights && (
         <TabsContent value="insights" className="mt-0">
           <BoomInsightsPanel
             viewerHierarchyLevel={reviewerHierarchyLevel}
@@ -744,6 +751,7 @@ export default function BoomReviewHub({
             onPeriodQuarterChange={setPeriodQuarter}
           />
         </TabsContent>
+        )}
       </Tabs>
 
       {runner && (

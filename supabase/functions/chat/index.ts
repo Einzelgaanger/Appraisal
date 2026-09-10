@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const allowedOrigins = [
+  "https://executive.vgg.app",
+  "https://ghc.vgg.app",
   "https://appraisal.vgg.app",
   "https://three60appraisal.onrender.com",
   "http://localhost:5173",
