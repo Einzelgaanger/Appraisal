@@ -16,6 +16,7 @@ import {
 import {
   ghcGetDiscussion,
   ghcGetMy360Aggregate,
+  ghcGetMyEvaluations,
   ghcGetQuarterlyEvaluation,
   ghcPostDiscussionMessage,
   type GhcTaskRow,
@@ -38,6 +39,16 @@ export default function GhcMyResults({
     scores: Array<{ key: string; label: string; avg: number }>;
     themes: Array<{ text: string }>;
   } | null>(null);
+  const [evals, setEvals] = useState<Array<{
+    id: string;
+    period: string;
+    status: string;
+    total_score: number | null;
+    total_pct: number | null;
+    band_rating: number | null;
+    manager_name: string | null;
+  }>>([]);
+  const [activeEvalId, setActiveEvalId] = useState<string | null>(null);
   const [evalRow, setEvalRow] = useState<Record<string, unknown> | null>(null);
   const [discussion, setDiscussion] = useState<{ messages: Array<{ id: string; authorName: string; body: string; createdAt: string }> } | null>(null);
   const [msg, setMsg] = useState('');
@@ -47,37 +58,52 @@ export default function GhcMyResults({
     (async () => {
       setLoading(true);
       try {
-        const data = await ghcGetMy360Aggregate(periodQuarter);
-        if (!cancelled) setAgg(data);
+        const [data, myEvals] = await Promise.all([
+          ghcGetMy360Aggregate(periodQuarter),
+          ghcGetMyEvaluations(periodQuarter).catch(() => []),
+        ]);
+        if (!cancelled) {
+          setAgg(data);
+          setEvals(myEvals);
+          if (!acknowledgeTask?.record_id && myEvals[0]?.id) {
+            setActiveEvalId(myEvals[0].id);
+          }
+        }
       } catch {
-        if (!cancelled) setAgg(null);
+        if (!cancelled) {
+          setAgg(null);
+          setEvals([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [periodQuarter]);
+  }, [periodQuarter, acknowledgeTask?.record_id]);
 
   useEffect(() => {
-    if (!acknowledgeTask?.record_id) {
+    const id = acknowledgeTask?.record_id || activeEvalId;
+    if (!id) {
       setEvalRow(null);
+      setDiscussion(null);
       return;
     }
-    void ghcGetQuarterlyEvaluation(acknowledgeTask.record_id).then(async (row) => {
+    void ghcGetQuarterlyEvaluation(id).then(async (row) => {
       setEvalRow(row);
       if (row?.id) {
         const d = await ghcGetDiscussion(row.id);
         setDiscussion({ messages: d?.messages ?? [] });
       }
     });
-  }, [acknowledgeTask?.record_id]);
+  }, [acknowledgeTask?.record_id, activeEvalId]);
 
   const postMsg = async () => {
-    if (!acknowledgeTask?.record_id || !msg.trim()) return;
+    const id = acknowledgeTask?.record_id || activeEvalId;
+    if (!id || !msg.trim()) return;
     try {
-      await ghcPostDiscussionMessage(acknowledgeTask.record_id, msg.trim());
+      await ghcPostDiscussionMessage(id, msg.trim());
       setMsg('');
-      const d = await ghcGetDiscussion(acknowledgeTask.record_id);
+      const d = await ghcGetDiscussion(id);
       setDiscussion({ messages: d?.messages ?? [] });
       toast.success('Message posted');
     } catch (e) {
@@ -92,6 +118,21 @@ export default function GhcMyResults({
       </div>
     );
   }
+
+  const ackTask: GhcTaskRow | null =
+    acknowledgeTask ||
+    (evals[0]
+      ? {
+          kind: 'acknowledge_evaluation',
+          title: 'Acknowledge quarterly evaluation',
+          subject_id: '',
+          subject_name: 'You',
+          subject_role: null,
+          period: evals[0].period,
+          status: evals[0].status,
+          record_id: evals[0].id,
+        }
+      : null);
 
   return (
     <div className="space-y-5">
@@ -134,9 +175,36 @@ export default function GhcMyResults({
         )}
       </div>
 
-      {acknowledgeTask && (
+      <div className="glass-panel p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Your quarterly evaluation</h3>
+        {evals.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No submitted evaluation for {periodQuarter} yet. After your manager submits, you will acknowledge it here.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {evals.map((ev) => (
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => setActiveEvalId(ev.id)}
+                className={`flex w-full flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs ${
+                  (acknowledgeTask?.record_id || activeEvalId) === ev.id ? 'border-primary bg-primary/5' : 'border-border/50'
+                }`}
+              >
+                <span className="font-medium">{ev.manager_name ?? 'Manager'}</span>
+                <Badge variant="outline" className="text-[10px]">{ev.status}</Badge>
+                <Badge variant="secondary" className="text-[10px]">{ev.total_score ?? '—'}/35 · {ev.total_pct ?? '—'}%</Badge>
+                <Badge className="text-[10px]">Band {ev.band_rating ?? '—'}</Badge>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {ackTask && (
         <div className="space-y-4">
-          <GhcAcknowledgePanel task={acknowledgeTask} onDone={onAcknowledged} embedded />
+          <GhcAcknowledgePanel task={ackTask} onDone={onAcknowledged} embedded />
           {evalRow && (
             <div className="glass-panel p-5 space-y-3">
               <h3 className="text-sm font-semibold">Evaluation discussion</h3>

@@ -674,7 +674,7 @@ DECLARE
   me uuid := public.ghc_me();
   rid uuid;
   report uuid := (_payload->>'report_id')::uuid;
-  period text := _payload->>'period';
+  v_period text := _payload->>'period';
   st text := COALESCE(_payload->>'status', 'draft');
 BEGIN
   IF me IS NULL OR NOT public.ghc_manages(me, report) THEN
@@ -696,7 +696,7 @@ BEGIN
     COALESCE((_payload->>'id')::uuid, gen_random_uuid()),
     COALESCE((_payload->>'manager_id')::uuid, me),
     report,
-    period,
+    v_period,
     st,
     (_payload->>'proud_this_month')::boolean,
     (_payload->>'personal_issues')::boolean,
@@ -756,7 +756,7 @@ BEGIN
       report, 'monthly_review_submitted',
       'Your monthly review was submitted',
       'Your manager submitted this month''s 1:1 review.',
-      '/hub?tab=survey', period
+      '/hub?tab=survey', v_period
     );
   END IF;
 
@@ -771,7 +771,7 @@ DECLARE
   me uuid := public.ghc_me();
   rid uuid;
   reviewee uuid := (_payload->>'reviewee_id')::uuid;
-  period text := _payload->>'period';
+  v_period text := _payload->>'period';
   st text := COALESCE(_payload->>'status', 'draft');
 BEGIN
   IF me IS NULL OR NOT public.ghc_is_active_member(me) THEN
@@ -791,7 +791,7 @@ BEGIN
     did_well, additional_comments, submitted_at, updated_at
   ) VALUES (
     COALESCE((_payload->>'id')::uuid, gen_random_uuid()),
-    me, reviewee, period, st,
+    me, reviewee, v_period, st,
     (_payload->>'score_founders_lps')::integer, _payload->>'example_founders_lps',
     (_payload->>'score_curious')::integer, _payload->>'example_curious',
     (_payload->>'score_move_fast')::integer, _payload->>'example_move_fast',
@@ -896,7 +896,7 @@ DECLARE
   me uuid := public.ghc_me();
   eid uuid;
   employee uuid := (_payload->>'employee_id')::uuid;
-  period text := _payload->>'period';
+  v_period text := _payload->>'period';
   st text := COALESCE(_payload->>'status', 'draft');
   scores record;
 BEGIN
@@ -931,7 +931,7 @@ BEGIN
     COALESCE((_payload->>'id')::uuid, gen_random_uuid()),
     COALESCE((_payload->>'manager_id')::uuid, me),
     employee,
-    period,
+    v_period,
     COALESCE(_payload->>'review_type', 'Q1'),
     st,
     (_payload->>'score_technical')::integer, _payload->>'comment_technical',
@@ -999,7 +999,7 @@ BEGIN
       employee, 'evaluation_submitted',
       'Your quarterly evaluation is ready',
       'Your manager submitted your quarterly performance evaluation.',
-      '/hub?tab=survey', period
+      '/hub?tab=survey', v_period
     );
   END IF;
 

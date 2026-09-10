@@ -56,6 +56,22 @@ export async function ghcGetMy360Aggregate(quarter: string) {
   return data;
 }
 
+export async function ghcGetMyEvaluations(quarter: string) {
+  const { data, error } = await db.rpc('ghc_get_my_evaluations', { _period_quarter: quarter });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    period: string;
+    status: string;
+    total_score: number | null;
+    total_pct: number | null;
+    band_rating: number | null;
+    submitted_at: string | null;
+    acknowledged_at: string | null;
+    manager_name: string | null;
+  }>;
+}
+
 export async function ghcGetQuarterlyEvaluation(id: string) {
   const { data, error } = await db.from('ghc_quarterly_evaluations').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
@@ -157,12 +173,19 @@ export async function ghcCreateInAppNotification(payload: {
 }
 
 export async function ghcAiDraftAssist(context: string) {
-  const { data, error } = await supabase.functions.invoke('ai-insights', {
-    body: {
-      mode: 'ghc_manager_draft',
-      context,
-    },
-  });
-  if (error) throw error;
-  return data as { text?: string; insights?: string[] } | null;
+  // Deterministic local draft — the chat edge function returns SSE for the admin panel,
+  // which is not usable from a simple invoke. Keep assist helpful offline for managers.
+  const text = [
+    'Manager draft scaffold (review and edit before scoring):',
+    '',
+    '1. Strengths — list 3 evidenced behaviours from monthly notes + 360 themes.',
+    '2. Improvements — list 2–3 concrete gaps with examples (HR requires evidence).',
+    '3. Goals — area / goal / indicator / timeline / reviewer for each improvement.',
+    '4. Culture narrative — one sentence per GHC value with proof.',
+    '5. Weighted score reminder — Culture /25 + Technical /5 + Growth /5 = /35.',
+    '',
+    '--- Your pasted context ---',
+    context.trim().slice(0, 6000) || '(no context yet)',
+  ].join('\n');
+  return { text, insights: [text] };
 }

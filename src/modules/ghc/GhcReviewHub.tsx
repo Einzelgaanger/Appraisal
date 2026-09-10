@@ -48,6 +48,11 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
   const periodQuarter = resolveQuarterPeriod(searchParams.get('ghcQuarter'));
   const periodMonth = resolveMonthPeriod(searchParams.get('ghcMonth'));
   const [tab, setTab] = useState(searchParams.get('ghcTab') || 'tasks');
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('ghcTab');
+    if (fromUrl && fromUrl !== tab) setTab(fromUrl);
+  }, [searchParams, tab]);
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<GhcTaskRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -112,6 +117,14 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
     return map;
   }, [tasks]);
 
+  const reportCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of tasks) {
+      if (t.kind === 'monthly_manager' || t.kind === 'quarterly_evaluation') ids.add(t.subject_id);
+    }
+    return ids.size;
+  }, [tasks]);
+
   const openTask = (task: GhcTaskRow) => {
     if (task.kind === 'acknowledge_evaluation') {
       setTab('results');
@@ -139,6 +152,14 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
             Monthly manager reviews, quarterly 360, and formal evaluations — separate from the Executive Team BOOM flow.
             {employeeName ? ` Signed in as ${employeeName}.` : ''}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {reportCount > 0 ? (
+              <Badge className="text-[10px]">Managing {reportCount} {reportCount === 1 ? 'person' : 'people'}</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">Peer reviewer — no direct reports this cycle</Badge>
+            )}
+            <Badge variant="secondary" className="text-[10px]">{tasks.length} open tasks</Badge>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={periodMonth} onValueChange={setPeriodMonth}>
@@ -251,7 +272,11 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
         </TabsContent>
 
         <TabsContent value="directory" className="mt-0">
-          <GhcDirectoryPanel periodQuarter={periodQuarter} periodMonth={periodMonth} />
+          <GhcDirectoryPanel
+            periodQuarter={periodQuarter}
+            periodMonth={periodMonth}
+            viewerEmployeeId={employeeId}
+          />
         </TabsContent>
 
         {ENABLE_APP_AI && (
