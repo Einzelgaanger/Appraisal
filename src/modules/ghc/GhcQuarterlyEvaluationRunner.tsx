@@ -66,6 +66,7 @@ export default function GhcQuarterlyEvaluationRunner({
     { area: '', goal: '', indicator: '', timeline: '', reviewer: '' },
   ]);
   const [partnerNotes, setPartnerNotes] = useState<Record<string, string>>({});
+  const [locked, setLocked] = useState(task.status === 'submitted' || task.status === 'acknowledged');
 
   useEffect(() => {
     if (!open) return;
@@ -74,9 +75,11 @@ export default function GhcQuarterlyEvaluationRunner({
     setStrengths(['', '', '', '', '']);
     setImprovements(['', '', '', '', '']);
     setRecordId(task.record_id);
+    setLocked(task.status === 'submitted' || task.status === 'acknowledged');
     if (!task.record_id) return;
     void ghcGetQuarterlyEvaluation(task.record_id).then((row) => {
       if (!row) return;
+      setLocked(row.status === 'submitted' || row.status === 'acknowledged');
       const nextScores: Record<string, number> = {};
       const nextComments: Record<string, string> = {};
       for (const ind of GHC_EVAL_INDICATORS) {
@@ -98,7 +101,7 @@ export default function GhcQuarterlyEvaluationRunner({
         setPartnerNotes(next);
       });
     });
-  }, [open, task.record_id]);
+  }, [open, task.record_id, task.status]);
 
   const computed = useMemo(() => {
     const cultureSum =
@@ -189,7 +192,8 @@ export default function GhcQuarterlyEvaluationRunner({
                     variant={scores[ind.key] === s.value ? 'default' : 'outline'}
                     className="h-8 px-2 text-[10px]"
                     title={s.label}
-                    onClick={() => setScores((prev) => ({ ...prev, [ind.key]: s.value }))}
+                    onClick={() => !locked && setScores((prev) => ({ ...prev, [ind.key]: s.value }))}
+                    disabled={locked}
                   >
                     {s.value}
                   </Button>
@@ -198,7 +202,8 @@ export default function GhcQuarterlyEvaluationRunner({
               <Textarea
                 placeholder="Supervisor comments"
                 value={comments[ind.key] || ''}
-                onChange={(e) => setComments((prev) => ({ ...prev, [ind.key]: e.target.value }))}
+                onChange={(e) => !locked && setComments((prev) => ({ ...prev, [ind.key]: e.target.value }))}
+                readOnly={locked}
                 rows={2}
               />
             </div>
@@ -268,8 +273,16 @@ export default function GhcQuarterlyEvaluationRunner({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
-          <Button disabled={busy} onClick={() => void save('submitted')}>Submit to employee</Button>
+          {locked ? (
+            <p className="mr-auto self-center text-[11px] text-muted-foreground">Submitted — read only.</p>
+          ) : null}
+          {!locked && (
+            <>
+              <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
+              <Button disabled={busy} onClick={() => void save('submitted')}>Submit to employee</Button>
+            </>
+          )}
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

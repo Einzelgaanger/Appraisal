@@ -70,6 +70,62 @@
     --sidebar-border: 191 38% 81%;
     --sidebar-ring: 202 65% 46%;
   }
+
+  /* GreenHouse Capital — deep teal + coral accents (distinct from VGG parent blue/green) */
+  html[data-tenant='ghc'] {
+    --background: 168 28% 96%;
+    --foreground: 180 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 180 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 40% 12%;
+
+    --primary: 175 58% 28%;
+    --primary-glow: 175 52% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 168 22% 90%;
+    --secondary-foreground: 180 40% 12%;
+
+    --muted: 168 20% 92%;
+    --muted-foreground: 180 14% 36%;
+
+    --accent: 18 58% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 160 45% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 168 18% 80%;
+    --input: 168 18% 80%;
+    --ring: 175 58% 28%;
+
+    --ink: 180 40% 12%;
+    --paper: 168 28% 96%;
+    --paper-deep: 168 22% 90%;
+
+    --chart-1: 175 58% 28%;
+    --chart-2: 18 58% 58%;
+    --chart-3: 180 40% 18%;
+    --chart-4: 160 45% 32%;
+    --chart-5: 0 72% 51%;
+
+    --score-excellent: 160 45% 32%;
+    --score-good: 175 58% 28%;
+    --score-average: 18 58% 58%;
+    --score-poor: 0 72% 51%;
+
+    --sidebar-background: 180 55% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 175 55% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 180 35% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 180 28% 18%;
+    --sidebar-ring: 18 58% 58%;
+  }
 }
 
 @layer base {

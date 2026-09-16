@@ -7,7 +7,7 @@ export function boomHierarchyLabel(level: number | null | undefined): string {
   if (level <= 0) return 'L0 · Top leadership';
   if (level === 1) return 'L1 · Functional lead';
   if (level === 2) return 'L2 · Team';
-  return 'Team member';
+  return `L${level} · Team member`;
 }
 
 /** Short hint for why peer forms may include extra manager-only sections */

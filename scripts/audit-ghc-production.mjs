@@ -67,32 +67,39 @@ const linked = (roster || []).filter((e) => (profiles || []).some((p) => p.emplo
 pass('Every active person has login profile', linked.length === (roster?.length || 0), `${linked.length}/${roster?.length}`);
 
 // 3) RPC presence
-for (const fn of [
-  'ghc_get_my_tasks',
-  'ghc_upsert_monthly_review',
-  'ghc_upsert_360',
-  'ghc_upsert_quarterly_evaluation',
-  'ghc_acknowledge_evaluation',
-  'ghc_get_my_360_aggregate',
-  'ghc_release_period',
-  'ghc_get_directory_status',
-  'ghc_create_notification',
-  'ghc_get_my_notifications',
-]) {
-  const { error } = await admin.rpc(fn, fn.includes('tasks')
-    ? { _period_month: month, _period_quarter: q }
-    : fn.includes('directory') || fn.includes('admin')
-      ? { _period_quarter: q, _period_month: month }
-      : fn.includes('360_aggregate') || fn.includes('evaluations')
-        ? { _period_quarter: q }
-        : fn.includes('notifications')
-          ? { _limit: 1 }
-          : fn.includes('release')
-            ? { _kind: 'peer_360', _period: q }
-            : {});
-  // service role may fail auth-sensitive RPCs — existence vs permission
+// Existence-only probes. Wrong-arity 404s look like "missing function" — pass minimal typed args.
+const rpcProbes = [
+  { fn: 'ghc_get_my_tasks', args: { _period_month: month, _period_quarter: q } },
+  { fn: 'ghc_upsert_monthly_review', args: { _payload: { report_id: null, period: month, status: 'draft' } } },
+  { fn: 'ghc_upsert_360', args: { _payload: { reviewee_id: null, period: q, status: 'draft' } } },
+  { fn: 'ghc_upsert_quarterly_evaluation', args: { _payload: { employee_id: null, period: q, status: 'draft' } } },
+  {
+    fn: 'ghc_acknowledge_evaluation',
+    args: {
+      _evaluation_id: '00000000-0000-0000-0000-000000000000',
+      _understanding: 'probe',
+      _employee_response: 'probe',
+    },
+  },
+  { fn: 'ghc_get_my_360_aggregate', args: { _period_quarter: q } },
+  { fn: 'ghc_release_period', args: { _kind: 'peer_360', _period: q } },
+  { fn: 'ghc_get_directory_status', args: { _period_quarter: q, _period_month: month } },
+  {
+    fn: 'ghc_create_notification',
+    args: {
+      _employee_id: '00000000-0000-0000-0000-000000000000',
+      _event_type: 'probe',
+      _title: 'probe',
+      _body: 'probe',
+    },
+  },
+  { fn: 'ghc_get_my_notifications', args: { _limit: 1 } },
+];
+
+for (const { fn, args } of rpcProbes) {
+  const { error } = await admin.rpc(fn, args);
   const missing = /Could not find the function|schema cache/i.test(error?.message || '');
-  pass(`RPC exists: ${fn}`, !missing, error && !missing ? `callable/perm: ${error.message.slice(0, 80)}` : 'ok');
+  pass(`RPC exists: ${fn}`, !missing, missing ? error?.message?.slice(0, 120) : 'present');
 }
 
 // 4) Live task matrix as each user

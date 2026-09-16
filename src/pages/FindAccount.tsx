@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import {
   Search, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Building2, Mail, X, ArrowRight,
 } from 'lucide-react';
-import vggLogo from '@/assets/vgg-logo.webp';
 import heroTeam from '@/assets/hero-team-mobile.jpg';
+import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
+import { isGhcTenant } from '@/tenants/config';
 
 interface EmployeeResult {
   id: string;
@@ -34,6 +36,9 @@ const compactSearchText = (value: string) => value.replace(/[^a-z0-9]/g, '');
 const EMPLOYEE_FETCH_BATCH = 1000;
 
 export default function FindAccount() {
+  const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
+  const ghc = isGhcTenant(tenant);
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<EmployeeResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -200,7 +205,7 @@ export default function FindAccount() {
       <div className="mobile-hero shrink-0 max-h-[24vh]">
         <img src={heroTeam} alt="A team in collaboration" />
         <div className="mobile-hero-caption">
-          <span>◉ VGG / BOOM — Account</span>
+          <span>{ghc ? '◉ GreenHouse Capital — Account' : '◉ VGG / BOOM — Account'}</span>
           <span>Auth / 03</span>
         </div>
       </div>
@@ -221,11 +226,13 @@ export default function FindAccount() {
           className="w-full max-w-md mobile-flow-card"
         >
           <div className="mb-4">
-            <img src={vggLogo} alt="Venture Garden Group" className="h-6 w-auto mb-5" />
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 object-contain" />
             <h1 className="text-xl font-semibold mb-1">Activate your account</h1>
             <p className="text-muted-foreground text-[13px] leading-relaxed">
               Find your name below — we&apos;ll email you a link to set your password and complete your profile. Then you can
-              access BOOM assessments (peer 360, executive self, monthly reflection) from the hub.
+              access {ghc
+                ? 'GreenHouse Capital appraisal tasks (monthly reviews, peer 360, quarterly evaluations)'
+                : 'BOOM assessments (peer 360, executive self, monthly reflection)'} from the hub.
             </p>
           </div>
 

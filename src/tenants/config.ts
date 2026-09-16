@@ -24,7 +24,8 @@ export const TENANTS: TenantConfig[] = [
   {
     slug: 'executiveteam',
     // Production: executive.vgg.app (also appraisal / executiveteam for legacy)
-    subdomains: ['executive', 'executiveteam', 'appraisal', 'localhost'],
+    // localhost is intentionally omitted — local prefers ?tenant= / profile subsidiary / env
+    subdomains: ['executive', 'executiveteam', 'appraisal'],
     subsidiaryId: EXECUTIVE_TEAM_SUBSIDIARY_ID,
     modules: ['appraisal'],
     appraisalMode: 'boom',
@@ -42,11 +43,11 @@ export const TENANTS: TenantConfig[] = [
     subsidiaryId: GHC_SUBSIDIARY_ID,
     modules: ['appraisal'],
     appraisalMode: 'ghc',
-    teamMemberMinLevel: 4,
+    teamMemberMinLevel: 3,
     branding: {
       shortName: 'GHC',
       fullName: 'GreenHouse Capital',
-      workspaceLabel: 'GreenHouse Capital appraisal',
+      workspaceLabel: 'GreenHouse Capital workspace',
     },
     capabilities: {
       showDemoRoute: false,
@@ -86,27 +87,41 @@ export function getTenantBySlug(slug: string | null | undefined): TenantConfig |
   return TENANTS.find((tenant) => tenant.slug === slug.trim().toLowerCase());
 }
 
+export function getTenantBySubsidiaryId(subsidiaryId: string | null | undefined): TenantConfig | undefined {
+  if (!subsidiaryId) return undefined;
+  return TENANTS.find((tenant) => tenant.subsidiaryId === subsidiaryId);
+}
+
 /**
- * Resolve tenant from hostname, then env fallback, then ?tenant= override.
- * Production: executive.vgg.app → EO BOOM; ghc.vgg.app → GHC.
- * Local: ?tenant=ghc or VITE_DEFAULT_TENANT=ghc.
+ * Resolve tenant from (in order):
+ * 1. ?tenant= query override
+ * 2. Hostname subdomain (executive.vgg.app / ghc.vgg.app)
+ * 3. Signed-in profile subsidiary (so GHC staff on localhost get GHC UI)
+ * 4. VITE_DEFAULT_TENANT
+ * 5. Executive Team default
  */
-export function resolveTenantFromHostname(hostname: string, search?: string): TenantConfig {
+export function resolveTenantFromHostname(
+  hostname: string,
+  search?: string,
+  options?: { subsidiaryId?: string | null },
+): TenantConfig {
   if (typeof search === 'string' && search.length) {
     const params = new URLSearchParams(search.startsWith('?') ? search : `?${search}`);
     const fromQuery = getTenantBySlug(params.get('tenant'));
     if (fromQuery) return fromQuery;
   }
 
-  const envSlug = typeof import.meta !== 'undefined'
-    ? (import.meta.env?.VITE_DEFAULT_TENANT as string | undefined)
-    : undefined;
-  const fromEnv = getTenantBySlug(envSlug);
-
   const subdomain = extractSubdomain(hostname);
   const fromHost = TENANTS.find((tenant) => tenant.subdomains.includes(subdomain));
   if (fromHost) return fromHost;
 
+  const fromSubsidiary = getTenantBySubsidiaryId(options?.subsidiaryId);
+  if (fromSubsidiary) return fromSubsidiary;
+
+  const envSlug = typeof import.meta !== 'undefined'
+    ? (import.meta.env?.VITE_DEFAULT_TENANT as string | undefined)
+    : undefined;
+  const fromEnv = getTenantBySlug(envSlug);
   return fromEnv ?? DEFAULT_TENANT;
 }
 

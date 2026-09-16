@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { ghcGetDirectory } from './ghcApi';
+import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
 
 type Row = {
   id: string;
@@ -86,7 +87,7 @@ export default function GhcDirectoryPanel({
           <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
             <th className="pb-2 pr-3">Name</th>
             <th className="pb-2 pr-3 hidden sm:table-cell">Role</th>
-            <th className="pb-2 pr-3">L</th>
+            <th className="pb-2 pr-3">Level</th>
             <th className="pb-2 pr-3">Monthly</th>
             <th className="pb-2 pr-3">360 in</th>
             <th className="pb-2">Eval</th>
@@ -104,7 +105,9 @@ export default function GhcDirectoryPanel({
                   {isMine && <Badge variant="outline" className="ml-2 text-[9px]">Your report</Badge>}
                 </td>
                 <td className="py-2 pr-3 hidden sm:table-cell text-xs text-muted-foreground">{r.role ?? '—'}</td>
-                <td className="py-2 pr-3 font-mono text-xs">{r.hierarchy_level ?? '—'}</td>
+                <td className="py-2 pr-3 text-xs text-muted-foreground">
+                  {displayHierarchyLabel(r.hierarchy_level, true, { appraisalMode: 'ghc' })}
+                </td>
                 <td className="py-2 pr-3">
                   <Badge variant={r.monthly_done ? 'default' : 'outline'} className="text-[10px]">
                     {r.monthly_done ? 'Done' : 'Open'}

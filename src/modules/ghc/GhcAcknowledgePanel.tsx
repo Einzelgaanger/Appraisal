@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ghcAcknowledgeEvaluation, ghcGetQuarterlyEvaluation, type GhcTaskRow } from './ghcApi';
 import { useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
+import GhcEvaluationDetail from './GhcEvaluationDetail';
 
 export default function GhcAcknowledgePanel({
   task,
@@ -55,14 +55,8 @@ export default function GhcAcknowledgePanel({
   const body = (
     <div className="space-y-4">
       {summary && (
-        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs space-y-1">
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="font-semibold">Score</span>
-            <Badge variant="secondary">{String(summary.total_score ?? '—')}/35</Badge>
-            <Badge variant="outline">{String(summary.total_pct ?? '—')}%</Badge>
-            <Badge>Band {String(summary.band_rating ?? '—')}</Badge>
-          </div>
-          <p className="text-muted-foreground">Status: {String(summary.status)}</p>
+        <div className="space-y-3">
+          <GhcEvaluationDetail row={summary} title="Evaluation you are acknowledging" />
         </div>
       )}
       <div className="space-y-2">

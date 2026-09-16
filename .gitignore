@@ -15,6 +15,9 @@ dist-ssr
 # Supabase CLI local link state (do not commit)
 supabase/.temp/
 
+# Local DB dump / migration scratch (may contain PII)
+tmp/
+
 # Environment — never commit secrets (copy .env.example to .env locally)
 .env
 .env.*

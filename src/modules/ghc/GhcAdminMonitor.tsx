@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import {
   ghcAdminListEvaluations,
   ghcGetAdminSummary,
+  ghcGetPartnerRecommendations,
   ghcReleasePeriod,
   ghcUpsertPartnerRecommendation,
 } from './ghcApi';
@@ -51,7 +52,33 @@ export default function GhcAdminMonitor({
 
   useEffect(() => {
     void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodQuarter, periodMonth]);
+
+  useEffect(() => {
+    if (!evalId) {
+      setPartnerDrafts({});
+      return;
+    }
+    void ghcGetPartnerRecommendations(evalId)
+      .then((rows) => {
+        const next: Record<string, string> = {};
+        for (const r of rows as Array<{
+          action_option: string;
+          partners_decision?: string | null;
+          recommendation_by_manager?: string | null;
+          recommendation_by_hr?: string | null;
+        }>) {
+          next[r.action_option] =
+            r.partners_decision ||
+            r.recommendation_by_hr ||
+            r.recommendation_by_manager ||
+            '';
+        }
+        setPartnerDrafts(next);
+      })
+      .catch(() => setPartnerDrafts({}));
+  }, [evalId]);
 
   const release = async (kind: 'peer_360' | 'quarterly_evaluation') => {
     try {
@@ -107,7 +134,7 @@ export default function GhcAdminMonitor({
       <div className="glass-panel p-5 space-y-3">
         <h3 className="text-sm font-semibold">Release gates</h3>
         <p className="text-xs text-muted-foreground">
-          Releasing 360 makes anonymous aggregates visible to subjects. Partner actions stay HR/admin controlled.
+          Periods shown: month {periodMonth} · quarter {periodQuarter}. Releasing 360 makes anonymous aggregates visible.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => void release('peer_360')}>Release peer 360 ({periodQuarter})</Button>

@@ -1,64 +1,41 @@
-# Supabase Migration (Old Project -> New Project)
+# Supabase Migration (Old → New) — completed runbook
 
-This runbook migrates your data from the old Supabase project to a new one and reconnects the app.
+## Projects
 
-## 1) Create and link the new Supabase project
+| Role | Name | Ref |
+|------|------|-----|
+| OLD (source) | VGG 360 Appraisal Project | `sgttsotrvemmgmujcuay` |
+| NEW (target) | Company Appraisals Project | `qnorggoycwbbxdlvbcvq` |
 
-```bash
-supabase login
-supabase projects list
-supabase link --project-ref YOUR_NEW_PROJECT_REF
-```
+## What was migrated (2026-09-16)
 
-## 2) Apply schema to the new project
+1. **Schema** — all local SQL migrations pushed to NEW (including multi-tenant + GHC).
+2. **Auth data** — `auth.*` dump restored (~47 users).
+3. **Public data** — truncated seed rows, then full public dump restored (`employees` 35, `profiles` 47, `assessment_responses` 115, `subsidiaries` 2).
+4. **App config** — `.env`, `supabase/config.toml`, and client defaults point at NEW.
 
-From this repo root:
+## Still needed: edge functions
 
-```bash
-supabase db push
-```
-
-This applies all migrations in `supabase/migrations`.
-
-## 3) Export data from old project
-
-Use your old database URL/password from old Supabase dashboard:
+CLI must be logged into the **VGG Tools** account that owns Company Appraisals:
 
 ```bash
-pg_dump "postgresql://postgres:OLD_DB_PASSWORD@db.OLD_PROJECT_REF.supabase.co:5432/postgres" \
-  --data-only \
-  --column-inserts \
-  --no-owner \
-  --no-privileges \
-  > old_data.sql
+npx supabase logout --yes
+npx supabase login
+npx supabase link --project-ref qnorggoycwbbxdlvbcvq
+node scripts/migrate-old-to-new-supabase.mjs functions
 ```
 
-## 4) Import data into new project
+Then set function secrets (from `.env`):
 
 ```bash
-psql "postgresql://postgres:NEW_DB_PASSWORD@db.YOUR_NEW_PROJECT_REF.supabase.co:5432/postgres" \
-  -f old_data.sql
+npx supabase secrets set --project-ref qnorggoycwbbxdlvbcvq CLAUDE_API_KEY=... CLAUDE_MODEL=... PERPLEXITY_API_KEY=... PERPLEXITY_MODEL=... RECOMMENDATION_EVALUATE_TOKEN=...
 ```
 
-## 5) Reconnect app env to the canonical project
+## Scripts
 
-This app uses **one** Supabase project for local and production: `sgttsotrvemmgmujcuay`.
+- `scripts/migrate-old-to-new-supabase.mjs` — `push` | `dump` | `restore` | `functions` | `switch-env` | `all`
+- `scripts/fix-public-restore.mjs` — truncate + reload public data
 
-Set `.env` values:
+## Auth note
 
-```env
-VITE_SUPABASE_URL=https://sgttsotrvemmgmujcuay.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=<anon public key from Dashboard → API>
-VITE_ENABLE_APP_AI=false
-```
-
-Restart dev server after editing `.env`.
-
-## 6) Deploy edge functions (only if needed)
-
-```bash
-supabase functions deploy
-```
-
-If you are replacing built-in AI with Claude externally, keep `VITE_ENABLE_APP_AI=false`.
-
+User passwords migrated with `auth.users`. After switching, restart `npm run dev` and smoke-test login. Clear site localStorage if an old-project session sticks.

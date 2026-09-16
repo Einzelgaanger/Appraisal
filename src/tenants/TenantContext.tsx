@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DEFAULT_TENANT, resolveTenantFromHostname } from './config';
@@ -7,19 +7,66 @@ import type { TenantConfig } from './types';
 
 interface TenantContextValue {
   tenant: TenantConfig;
+  /** Prefer this subsidiary when hostname/query do not already pin a tenant (e.g. localhost). */
+  setSubsidiaryHint: (subsidiaryId: string | null | undefined) => void;
 }
 
-const TenantContext = createContext<TenantContextValue>({ tenant: DEFAULT_TENANT });
+const TenantContext = createContext<TenantContextValue>({
+  tenant: DEFAULT_TENANT,
+  setSubsidiaryHint: () => undefined,
+});
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const [subsidiaryHint, setSubsidiaryHintState] = useState<string | null>(null);
+
+  const setSubsidiaryHint = useCallback((subsidiaryId: string | null | undefined) => {
+    setSubsidiaryHintState(subsidiaryId?.trim() || null);
+  }, []);
 
   const tenant = useMemo(() => {
     if (typeof window === 'undefined') return DEFAULT_TENANT;
-    return resolveTenantFromHostname(window.location.hostname, location.search);
-  }, [location.search]);
+    return resolveTenantFromHostname(window.location.hostname, location.search, {
+      subsidiaryId: subsidiaryHint,
+    });
+  }, [location.search, subsidiaryHint]);
 
-  return <TenantContext.Provider value={{ tenant }}>{children}</TenantContext.Provider>;
+  useEffect(() => {
+    document.documentElement.dataset.tenant = tenant.slug;
+    document.title = `${tenant.branding.fullName} Appraisal`;
+
+    const faviconHref = tenant.slug === 'ghc' ? '/ghc-favicon.png' : '/favicon.png';
+    const themeColor = tenant.slug === 'ghc' ? '#003333' : '#1a2e22';
+
+    const ensureLink = (rel: string, href: string) => {
+      let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+      if (rel === 'icon') link.type = 'image/png';
+    };
+
+    ensureLink('icon', faviconHref);
+    ensureLink('apple-touch-icon', faviconHref);
+
+    let themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.name = 'theme-color';
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.content = themeColor;
+  }, [tenant.slug, tenant.branding.fullName]);
+
+  const value = useMemo(
+    () => ({ tenant, setSubsidiaryHint }),
+    [tenant, setSubsidiaryHint],
+  );
+
+  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
 }
 
 export function useTenant() {

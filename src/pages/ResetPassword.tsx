@@ -7,10 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, CheckCircle2, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import vggLogo from '@/assets/vgg-logo.webp';
 import heroTeam from '@/assets/hero-team-mobile.jpg';
+import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
+import { isGhcTenant } from '@/tenants/config';
 
 export default function ResetPassword() {
+  const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
+  const ghc = isGhcTenant(tenant);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -113,7 +118,7 @@ export default function ResetPassword() {
       <div className="mobile-hero shrink-0">
         <img src={heroTeam} alt="Team collaboration at VGG" />
         <div className="mobile-hero-caption">
-          <span>◉ VGG / Activate</span>
+          <span>{ghc ? '◉ GreenHouse Capital / Activate' : '◉ VGG / Activate'}</span>
           <span>Auth / Set password</span>
         </div>
       </div>
@@ -133,13 +138,14 @@ export default function ResetPassword() {
           className="w-full max-w-md mobile-flow-card"
         >
           <div className="mb-6">
-            <img src={vggLogo} alt="Venture Garden Group" className="h-6 w-auto mb-5" />
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 object-contain" />
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center mb-3">
               <Lock className="w-5 h-5 text-primary-foreground" />
             </div>
             <h1 className="text-xl font-semibold">Set your new password</h1>
             <p className="text-muted-foreground mt-1 text-[13px]">
-              Choose a secure password — you'll use this every time you sign in to VGG Appraisals.
+              Choose a secure password — you&apos;ll use this every time you sign in to{' '}
+              {ghc ? 'GreenHouse Capital appraisal' : 'VGG Appraisals'}.
             </p>
           </div>
 

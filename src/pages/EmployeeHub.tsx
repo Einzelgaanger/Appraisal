@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import PlatformSidebar from '@/components/PlatformSidebar';
 import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar';
-import vggLogo from '@/assets/vgg-logo.webp';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
   Building2, User, ClipboardList, Send, Loader2, Shield,
@@ -86,6 +86,7 @@ const pageTransition = {
 export default function EmployeeHub() {
   const { user, profile, isAdmin, logout } = useEmployeeAuth();
   const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'survey';
@@ -93,6 +94,20 @@ export default function EmployeeHub() {
   const showGrowthHub = tenant.capabilities.showGrowthHub;
   const boomMode = isBoomTenant(tenant);
   const ghcMode = isGhcTenant(tenant);
+
+  // Keep shareable URLs on GHC once the signed-in company resolves to GreenHouse Capital.
+  useEffect(() => {
+    if (!ghcMode) return;
+    if (searchParams.get('tenant')) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tenant', 'ghc');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [ghcMode, searchParams, setSearchParams]);
 
   // Survey state
   const [step, setStep] = useState<'subsidiary' | 'employee' | 'questions' | 'submitted'>('subsidiary');
@@ -945,8 +960,8 @@ export default function EmployeeHub() {
         title={tenant.branding.workspaceLabel}
         subtitle={profile?.name}
         meta={[
-          { label: 'Subsidiary', value: currentEmployeeSubsidiary ?? 'Unlisted' },
-          { label: 'Department', value: currentEmployee?.department ?? profile?.department ?? 'Unassigned' },
+          { label: ghcMode ? 'Company' : 'Subsidiary', value: currentEmployeeSubsidiary ?? 'Unlisted' },
+          { label: ghcMode ? 'Team' : 'Department', value: currentEmployee?.department ?? profile?.department ?? 'Unassigned' },
           { label: 'Role', value: currentEmployee?.role ?? 'Employee' },
         ]}
         onLogout={handleLogout}
@@ -956,7 +971,7 @@ export default function EmployeeHub() {
           {
             key: 'growth',
             label: 'Growth Hub',
-            icon: <img src="/favicon.png" alt="Growth Hub" className="w-4 h-4 rounded-sm object-contain" />,
+            icon: <img src={brand.faviconHref} alt="Growth Hub" className="w-4 h-4 rounded-sm object-contain" />,
             active: activeTab === 'growth',
             onClick: () => setTab('growth')
           },
@@ -987,7 +1002,7 @@ export default function EmployeeHub() {
       >
         <div className="px-4 h-14 flex items-center justify-between min-h-[3.5rem]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src={vggLogo} alt="VGG" className="h-6 w-auto flex-shrink-0" />
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 object-contain" />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
               ◉ {activeTab === 'survey' ? 'Appraisal'
                   : activeTab === 'dashboard' ? 'My Dashboard'
@@ -1366,12 +1381,21 @@ export default function EmployeeHub() {
           {/* ============ GROWTH HUB TAB ============ */}
           <TabsContent value="growth" className="mt-4">
             {ghcMode ? (
-              <div className="glass-panel p-6 space-y-3">
-                <h3 className="text-sm font-semibold">GHC growth focus</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Use quarterly evaluation improvement goals and culture radar from My results. Manager monthly reviews
-                  capture OKR and fulfilment signals each month.
-                </p>
+              <div className="glass-panel p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <img src={brand.logoMark} alt={brand.logoAlt} className="h-10 w-auto object-contain" />
+                  <div>
+                    <h3 className="text-sm font-semibold">GreenHouse Capital growth</h3>
+                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                      Growth plans live inside quarterly evaluations (improvement goals) and monthly manager reviews
+                      (OKRs, fulfilment, development notes). Open Appraisal → My results for your culture radar and
+                      evaluation discussion thread.
+                    </p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setTab('dashboard')}>
+                  Open My results
+                </Button>
               </div>
             ) : (
             <motion.div {...pageTransition}>
@@ -1381,7 +1405,7 @@ export default function EmployeeHub() {
                 </div>
               ) : !user ? null : myScores.length === 0 ? (
                 <div className="glass-panel p-12 text-center">
-                  <img src="/favicon.png" alt="Growth Hub" className="w-10 h-10 mx-auto mb-4 rounded-xl object-contain" />
+                  <img src={brand.faviconHref} alt="Growth Hub" className="w-10 h-10 mx-auto mb-4 rounded-xl object-contain" />
                   <h2 className="text-lg font-semibold mb-2">Growth Hub Unlocks With Feedback</h2>
                   <p className="text-muted-foreground text-sm max-w-md mx-auto leading-relaxed">
                     We use your <strong>dashboard competency scores</strong> (legacy survey and/or released BOOM peer 360).
@@ -1394,7 +1418,7 @@ export default function EmployeeHub() {
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-5 bg-secondary/35">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                        <img src="/favicon.png" alt="Growth Hub" className="w-5 h-5 rounded-sm object-contain" />
+                        <img src={brand.faviconHref} alt="Growth Hub" className="w-5 h-5 rounded-sm object-contain" />
                       </div>
                       <div>
                         <h2 className="text-base font-bold">Your Growth Hub</h2>

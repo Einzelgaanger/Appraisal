@@ -81,14 +81,17 @@ export default function GhcMonthlyReviewRunner({
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
+  const [locked, setLocked] = useState(task.status === 'submitted' || task.status === 'acknowledged');
 
   useEffect(() => {
     if (!open) return;
     setForm(empty);
     setRecordId(task.record_id);
+    setLocked(task.status === 'submitted' || task.status === 'acknowledged');
     if (!task.record_id) return;
     void ghcGetMonthlyReview(task.record_id).then((row) => {
       if (!row) return;
+      setLocked(row.status === 'submitted' || row.status === 'acknowledged');
       setForm({
         proud_this_month: row.proud_this_month,
         personal_issues: row.personal_issues,
@@ -165,7 +168,7 @@ export default function GhcMonthlyReviewRunner({
         <p className="text-xs text-muted-foreground">
           Guide the recurring conversation with your direct report. HR requires evidence — be detailed. Period {task.period}.
         </p>
-        <div className="space-y-5 py-2">
+        <div className={`space-y-5 py-2 ${locked ? 'pointer-events-none opacity-90' : ''}`}>
           <Field label="Proud of something this month?">
             <YesNo id="proud" value={form.proud_this_month} onChange={(v) => setForm((f) => ({ ...f, proud_this_month: v }))} />
           </Field>
@@ -256,8 +259,16 @@ export default function GhcMonthlyReviewRunner({
           </Field>
         </div>
         <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
-          <Button disabled={busy} onClick={() => void save('submitted')}>Submit</Button>
+          {locked ? (
+            <p className="mr-auto self-center text-[11px] text-muted-foreground">Submitted — read only.</p>
+          ) : null}
+          {!locked && (
+            <>
+              <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
+              <Button disabled={busy} onClick={() => void save('submitted')}>Submit</Button>
+            </>
+          )}
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

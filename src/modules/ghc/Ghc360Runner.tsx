@@ -41,14 +41,17 @@ export default function Ghc360Runner({
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
+  const [locked, setLocked] = useState(task.status === 'submitted');
 
   useEffect(() => {
     if (!open) return;
     setForm(empty);
     setRecordId(task.record_id);
+    setLocked(task.status === 'submitted');
     if (!task.record_id) return;
     void ghcGet360Response(task.record_id).then((row) => {
       if (!row) return;
+      setLocked(row.status === 'submitted');
       setForm({
         score_founders_lps: row.score_founders_lps ?? 0,
         example_founders_lps: row.example_founders_lps ?? '',
@@ -64,7 +67,7 @@ export default function Ghc360Runner({
         additional_comments: row.additional_comments ?? '',
       });
     });
-  }, [open, task.record_id]);
+  }, [open, task.record_id, task.status]);
 
   const scoreKey = (key: string) => `score_${key}` as keyof typeof empty;
   const exampleKey = (key: string) => `example_${key}` as keyof typeof empty;
@@ -115,7 +118,7 @@ export default function Ghc360Runner({
           End-of-quarter praise or constructive feedback. Be constructive and truthful. Your name is stored for HR evidence
           but stays anonymous to {task.subject_name}. Period {task.period}.
         </p>
-        <div className="space-y-6 py-2">
+        <div className={`space-y-6 py-2 ${locked ? 'pointer-events-none opacity-90' : ''}`}>
           {GHC_CULTURE_VALUES.map((c) => (
             <div key={c.key} className="space-y-2 rounded-xl border border-border/60 p-3">
               <Label className="text-sm font-medium leading-snug">{c.label}</Label>
@@ -152,8 +155,16 @@ export default function Ghc360Runner({
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
-          <Button disabled={busy} onClick={() => void save('submitted')}>Submit</Button>
+          {locked ? (
+            <p className="mr-auto self-center text-[11px] text-muted-foreground">Submitted — read only.</p>
+          ) : null}
+          {!locked && (
+            <>
+              <Button variant="outline" disabled={busy} onClick={() => void save('draft')}>Save draft</Button>
+              <Button disabled={busy} onClick={() => void save('submitted')}>Submit</Button>
+            </>
+          )}
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

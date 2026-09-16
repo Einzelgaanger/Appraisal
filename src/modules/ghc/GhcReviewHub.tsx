@@ -19,7 +19,8 @@ import {
   resolveQuarterPeriod,
 } from '@/lib/boomPeriods';
 import { ENABLE_APP_AI } from '@/lib/featureFlags';
-import { ghcGetMyTasks, type GhcTaskRow } from './ghcApi';
+import { ghcGetDirectory, ghcGetMyTasks, type GhcTaskRow } from './ghcApi';
+import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
 import GhcMonthlyReviewRunner from './GhcMonthlyReviewRunner';
 import Ghc360Runner from './Ghc360Runner';
 import GhcQuarterlyEvaluationRunner from './GhcQuarterlyEvaluationRunner';
@@ -47,16 +48,30 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
   const [searchParams, setSearchParams] = useSearchParams();
   const periodQuarter = resolveQuarterPeriod(searchParams.get('ghcQuarter'));
   const periodMonth = resolveMonthPeriod(searchParams.get('ghcMonth'));
-  const [tab, setTab] = useState(searchParams.get('ghcTab') || 'tasks');
+  const [tab, setTabState] = useState(searchParams.get('ghcTab') || 'tasks');
+
+  const setTab = useCallback(
+    (next: string) => {
+      setTabState(next);
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.set('ghcTab', next);
+        if (!params.get('tenant')) params.set('tenant', 'ghc');
+        return params;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   useEffect(() => {
     const fromUrl = searchParams.get('ghcTab');
-    if (fromUrl && fromUrl !== tab) setTab(fromUrl);
+    if (fromUrl && fromUrl !== tab) setTabState(fromUrl);
   }, [searchParams, tab]);
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<GhcTaskRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [runner, setRunner] = useState<GhcTaskRow | null>(null);
+  const [levelById, setLevelById] = useState<Record<string, number>>({});
 
   const setPeriodQuarter = useCallback(
     (q: string) => {
@@ -107,6 +122,23 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
     void load();
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void ghcGetDirectory(periodQuarter, periodMonth)
+      .then((rows) => {
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        for (const r of rows as Array<{ id: string; hierarchy_level: number | null }>) {
+          if (r.hierarchy_level != null) map[r.id] = r.hierarchy_level;
+        }
+        setLevelById(map);
+      })
+      .catch(() => {
+        if (!cancelled) setLevelById({});
+      });
+    return () => { cancelled = true; };
+  }, [periodQuarter, periodMonth]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, GhcTaskRow[]>();
     for (const t of tasks) {
@@ -147,11 +179,11 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">GreenHouse Capital</p>
-          <h2 className="font-display text-2xl font-medium tracking-tight">Appraisal workspace</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Monthly manager reviews, quarterly 360, and formal evaluations — separate from the Executive Team BOOM flow.
-            {employeeName ? ` Signed in as ${employeeName}.` : ''}
-          </p>
+            <h2 className="font-display text-2xl font-medium tracking-tight">Your appraisal workspace</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Monthly manager reviews, quarterly 360, and formal evaluations for GreenHouse Capital.
+              {employeeName ? ` Signed in as ${employeeName}.` : ''}
+            </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {reportCount > 0 ? (
               <Badge className="text-[10px]">Managing {reportCount} {reportCount === 1 ? 'person' : 'people'}</Badge>
@@ -230,7 +262,7 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
                         <thead>
                           <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
                             <th className="pb-2 pr-3 font-medium">Person</th>
-                            <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Role</th>
+                            <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Level</th>
                             <th className="pb-2 pr-3 font-medium">Period</th>
                             <th className="pb-2 pr-3 font-medium">Status</th>
                             <th className="pb-2 font-medium text-right">Action</th>
@@ -240,7 +272,9 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
                           {list.map((row) => (
                             <tr key={`${row.kind}-${row.subject_id}-${row.period}`} className="border-b border-border/40 last:border-0">
                               <td className="py-2.5 pr-3 font-medium">{row.subject_name}</td>
-                              <td className="py-2.5 pr-3 hidden sm:table-cell text-xs text-muted-foreground">{row.subject_role ?? '—'}</td>
+                              <td className="py-2.5 pr-3 hidden sm:table-cell text-xs text-muted-foreground">
+                                {displayHierarchyLabel(levelById[row.subject_id], true, { appraisalMode: 'ghc' })}
+                              </td>
                               <td className="py-2.5 pr-3 font-mono text-xs">{row.period}</td>
                               <td className="py-2.5 pr-3">{statusBadge(row.status)}</td>
                               <td className="py-2.5 text-right">

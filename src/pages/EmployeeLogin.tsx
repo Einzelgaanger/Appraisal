@@ -8,11 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import vggLogo from '@/assets/vgg-logo.webp';
+import { cn } from '@/lib/utils';
 import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
+import { isGhcTenant } from '@/tenants/config';
 
 export default function EmployeeLogin() {
   const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
+  const ghc = isGhcTenant(tenant);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +28,22 @@ export default function EmployeeLogin() {
   const location = useLocation();
   const returnTo =
     (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
-  const afterLogin = returnTo ? `${returnTo.pathname}${returnTo.search ?? ''}` : '/hub?tab=survey';
+  const afterLoginBase = returnTo ? `${returnTo.pathname}${returnTo.search ?? ''}` : '/hub?tab=survey';
+
+  const resolveAfterLogin = (loginEmail: string) => {
+    try {
+      const url = new URL(afterLoginBase, window.location.origin);
+      const isGhcEmail =
+        loginEmail.trim().toLowerCase().endsWith('@greenhouse.capital') ||
+        loginEmail.trim().toLowerCase().endsWith('@greenhousecapital.com');
+      if ((ghc || isGhcEmail) && !url.searchParams.get('tenant')) {
+        url.searchParams.set('tenant', 'ghc');
+      }
+      return `${url.pathname}${url.search}`;
+    } catch {
+      return afterLoginBase;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +59,7 @@ export default function EmployeeLogin() {
           setError('Sign-in succeeded but the session was not saved. Check that cookies/storage are allowed and try again.');
           return;
         }
-        window.location.assign(afterLogin);
+        window.location.assign(resolveAfterLogin(email));
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -82,17 +101,24 @@ export default function EmployeeLogin() {
             className="flex flex-1 flex-col min-h-0 w-full max-w-md mx-auto px-4 sm:px-6 lg:flex-none lg:justify-center"
           >
             <div className="mobile-flow-content px-0 py-2 sm:px-0 lg:overflow-visible lg:px-0 lg:py-0">
-              <img src={vggLogo} alt="Venture Garden Group" className="h-6 w-auto mb-6 sm:mb-8" />
+              <img
+                src={ghc ? brand.logo : brand.logoMark}
+                alt={brand.logoAlt}
+                className={cn('mb-6 sm:mb-8', ghc ? brand.logoClassName : brand.logoMarkClassName)}
+              />
+              {brand.parentCredit ? (
+                <p className="mb-4 -mt-3 text-[11px] text-muted-foreground">{brand.parentCredit}</p>
+              ) : null}
 
               <div className="mb-6 sm:mb-8">
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-foreground/60">
-                  Employee
+                  {ghc ? 'GreenHouse Capital' : 'Employee'}
                 </span>
                 <h1 className="mt-2.5 font-serif text-[1.65rem] font-semibold leading-[1.0] tracking-[-0.02em] sm:text-[2.35rem] sm:leading-[0.98]">
                   Welcome back.
                 </h1>
                 <p className="mt-2 text-[13px] text-foreground/60 sm:text-sm leading-relaxed">
-                  {tenant.branding.workspaceLabel} - after sign-in you&apos;ll open your appraisal hub with tasks, dashboard, and growth tools based on your role. Secure employee access only.
+                  {tenant.branding.workspaceLabel} — after sign-in you&apos;ll open your appraisal hub with tasks, dashboard, and growth tools based on your role. Secure employee access only.
                 </p>
               </div>
 

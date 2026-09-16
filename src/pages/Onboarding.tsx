@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, ArrowRight, Search, KeyRound } from 'lucide-react';
-import vggLogo from '@/assets/vgg-logo.webp';
+import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
+import { isGhcTenant } from '@/tenants/config';
 import heroFeedbackSession from '@/assets/hero-feedback-session.jpg';
 import heroReflectionData from '@/assets/hero-reflection-data.jpg';
 import heroTeam from '@/assets/hero-team-mobile.jpg';
@@ -22,7 +24,7 @@ type SlideDef = {
   caption: string;
 };
 
-const SLIDES: SlideDef[] = [
+const EO_SLIDES: SlideDef[] = [
   {
     no: '01',
     label: 'Overview',
@@ -55,15 +57,52 @@ const SLIDES: SlideDef[] = [
   },
 ];
 
+const GHC_SLIDES: SlideDef[] = [
+  {
+    no: '01',
+    label: 'Overview',
+    kicker: 'GreenHouse Capital appraisal',
+    headlineHTML: 'Monthly, 360, and <em>formal quarterly evals.</em>',
+    body:
+      'GreenHouse Capital runs on the same VGG platform with its own cadence: manager monthly reviews, anonymous peer 360, and scored quarterly evaluations (Culture /25 + Technical /5 + Growth /5).',
+    image: heroTeam,
+    caption: 'Fig. 01 — GHC appraisal workspace',
+  },
+  {
+    no: '02',
+    label: 'Inside the hub',
+    kicker: 'Tasks · Results · Directory · Monitor',
+    headlineHTML: 'Line-manager work. <em>Clear pools.</em>',
+    body:
+      'Tasks follow your reporting line. My results show released 360 themes, monthly reviews you received, and quarterly evaluation detail plus discussion. HR releases aggregates and finalises partner actions.',
+    image: heroFeedbackSession,
+    caption: 'Fig. 02 — GHC reviews and results',
+  },
+  {
+    no: '03',
+    label: 'Access',
+    kicker: 'Sign in securely',
+    headlineHTML: 'Your GHC login. <em>Your workspace.</em>',
+    body:
+      'Sign in with your GreenHouse Capital email. Use Find my account if you still need to activate. Live host: ghc.vgg.app.',
+    image: heroReflectionData,
+    caption: 'Fig. 03 — Secure GHC access',
+  },
+];
+
 export default function Onboarding() {
+  const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
+  const ghc = isGhcTenant(tenant);
+  const slides = ghc ? GHC_SLIDES : EO_SLIDES;
   const [slide, setSlide] = useState(0);
   const navigate = useNavigate();
 
-  const next = useCallback(() => setSlide((s) => Math.min(s + 1, SLIDES.length - 1)), []);
+  const next = useCallback(() => setSlide((s) => Math.min(s + 1, slides.length - 1)), [slides.length]);
   const prev = useCallback(() => setSlide((s) => Math.max(s - 1, 0)), []);
-  const current = SLIDES[slide];
-  const isLast = slide === SLIDES.length - 1;
-  const progress = ((slide + 1) / SLIDES.length) * 100;
+  const current = slides[slide];
+  const isLast = slide === slides.length - 1;
+  const progress = ((slide + 1) / slides.length) * 100;
 
   return (
     <div className="mobile-flow-shell app-page flex min-h-dvh-screen flex-col">
@@ -73,17 +112,17 @@ export default function Onboarding() {
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <img src={vggLogo} alt="VGG" className="h-6 w-auto sm:h-7" />
+          <img src={brand.logoMark} alt={brand.logoAlt} className="h-7 w-auto sm:h-8 object-contain" />
           <div className="hidden h-5 w-px bg-border sm:block" />
           <span className="font-mono hidden sm:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-            VGG / BOOM — EO Appraisal
+            {ghc ? 'GreenHouse Capital · Appraisal' : 'VGG / BOOM — EO Appraisal'}
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="font-mono hidden lg:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-            BOOM v2 · 2026
+            {ghc ? 'GHC · 2026' : 'BOOM v2 · 2026'}
           </span>
-          <Button variant="green" size="sm" className="h-8 px-3 text-xs" onClick={() => navigate('/login')}>
+          <Button variant="green" size="sm" className="h-8 px-3 text-xs" onClick={() => navigate(ghc ? '/login?tenant=ghc' : '/login')}>
             Sign In
           </Button>
         </div>
@@ -92,7 +131,7 @@ export default function Onboarding() {
       {/* Step strip */}
       <div className="border-b border-border bg-card/45 px-3 py-2.5 sm:px-0 sm:py-0">
         <div className="grid grid-cols-3 gap-2 pb-1.5 sm:gap-0 sm:pb-0">
-          {SLIDES.map((s, i) => {
+          {slides.map((s, i) => {
             const active = i === slide;
             return (
               <button
@@ -113,7 +152,7 @@ export default function Onboarding() {
                 </span>
                 <div className="min-w-0">
                   <div className="text-[9px] font-medium text-muted-foreground sm:text-[10px]">
-                    {i + 1} / {SLIDES.length}
+                    {i + 1} / {slides.length}
                   </div>
                   <div className="truncate text-[12px] font-semibold text-foreground sm:mt-0.5 sm:text-[13px]">
                     {s.label}
@@ -229,7 +268,7 @@ export default function Onboarding() {
                     Coming next
                   </p>
                   <p className="mt-1 text-[13px] text-foreground">
-                    {SLIDES[slide + 1].label}: {SLIDES[slide + 1].kicker}
+                    {slides[slide + 1].label}: {slides[slide + 1].kicker}
                   </p>
                 </div>
               )}
@@ -250,7 +289,7 @@ export default function Onboarding() {
           {/* Footer controls — sticky on small screens for thumb reach */}
           <div className="z-10 -mx-4 mt-6 flex items-center justify-between border-t border-border bg-background/95 px-4 pt-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 pb-safe sm:mx-0 sm:mt-9 sm:bg-transparent sm:px-0 sm:pt-5 sm:pb-0 sm:backdrop-blur-none lg:mt-10">
             <span className="rounded-md border border-border bg-card px-2 py-0.5 text-[9px] font-medium tracking-normal text-muted-foreground sm:text-[10px]">
-              {String(slide + 1).padStart(2, '0')} / {String(SLIDES.length).padStart(2, '0')}
+              {String(slide + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
             </span>
             <div className="flex items-center gap-2">
               <Button

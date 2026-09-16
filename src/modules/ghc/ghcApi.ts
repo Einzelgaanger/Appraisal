@@ -190,6 +190,39 @@ export async function ghcCreateInAppNotification(payload: {
   if (error) throw error;
 }
 
+export async function ghcListSubmittedMonthlyForMe(periodMonth: string) {
+  const { data, error } = await db
+    .from('ghc_monthly_reviews')
+    .select('*')
+    .eq('period', periodMonth)
+    .eq('status', 'submitted')
+    .order('submitted_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Array<Record<string, unknown>>;
+}
+
+export async function ghcListAccessibleEvaluations(periodQuarter: string) {
+  const { data, error } = await db
+    .from('ghc_quarterly_evaluations')
+    .select('id, period, status, total_score, total_pct, band_rating, employee_id, manager_id, submitted_at, acknowledged_at')
+    .eq('period', periodQuarter)
+    .in('status', ['submitted', 'acknowledged'])
+    .order('submitted_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    period: string;
+    status: string;
+    total_score: number | null;
+    total_pct: number | null;
+    band_rating: number | null;
+    employee_id: string;
+    manager_id: string;
+    submitted_at: string | null;
+    acknowledged_at: string | null;
+  }>;
+}
+
 export async function ghcAiDraftAssist(context: string) {
   // Deterministic local draft — the chat edge function returns SSE for the admin panel,
   // which is not usable from a simple invoke. Keep assist helpful offline for managers.

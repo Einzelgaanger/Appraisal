@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
@@ -15,10 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import vggLogo from '@/assets/vgg-logo.webp';
 import heroHub from '@/assets/hero-hub.jpg';
-import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
+import {
+  displayHierarchyLabel,
+  GHC_DEPARTMENTS,
+  GHC_ROLES,
+  hierarchyLevelOptions,
+  isGhcOrgContext,
+} from '@/lib/hierarchyConvention';
 import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
+import { GHC_SUBSIDIARY_ID } from '@/tenants/config';
 
 interface Subsidiary { id: string; name: string; hierarchy_lower_is_senior?: boolean; }
 interface EmployeeOption {
@@ -30,7 +37,13 @@ interface EmployeeOption {
   email: string | null;
 }
 
-const HIERARCHY_LEVEL_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
+interface ProfileDraft {
+  name: string;
+  role: string;
+  department: string;
+  subsidiaryId: string;
+  hierarchyLevel: string;
+}
 
 const FALLBACK_DEPARTMENTS = ['Executive', 'Finance', 'HR', 'Investment', 'Legal', 'Operations', 'Portfolio', 'Sales', 'Technology'];
 const FALLBACK_ROLES = ['Analyst', 'Associate', 'Senior Associate', 'Manager', 'Principal', 'Head of Department', 'Director', 'Partner'];
@@ -39,21 +52,78 @@ const uniqueSorted = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b));
 
+const pickCanonical = (value: string | null | undefined, options: readonly string[]) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return '';
+  const match = options.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return match ?? '';
+};
+
+/** Map seeded GHC levels (incl. 4) onto the three profile seniority choices. */
+const normalizeGhcLevelForForm = (level: number | null | undefined): string => {
+  if (level == null || Number.isNaN(level)) return '';
+  if (level <= 1) return '1';
+  if (level === 2) return '2';
+  return '3';
+};
+
+const draftStorageKey = (userId: string) => `vgg_profile_draft_${userId}`;
+
+const readDraft = (userId: string | undefined): ProfileDraft | null => {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(draftStorageKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ProfileDraft>;
+    return {
+      name: typeof parsed.name === 'string' ? parsed.name : '',
+      role: typeof parsed.role === 'string' ? parsed.role : '',
+      department: typeof parsed.department === 'string' ? parsed.department : '',
+      subsidiaryId: typeof parsed.subsidiaryId === 'string' ? parsed.subsidiaryId : '',
+      hierarchyLevel: typeof parsed.hierarchyLevel === 'string' ? parsed.hierarchyLevel : '',
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeDraft = (userId: string | undefined, draft: ProfileDraft) => {
+  if (!userId || typeof window === 'undefined') return;
+  window.localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft));
+};
+
+const clearDraft = (userId: string | undefined) => {
+  if (!userId || typeof window === 'undefined') return;
+  window.localStorage.removeItem(draftStorageKey(userId));
+};
+
 export default function ProfileCompletionGate({ children }: { children: ReactNode }) {
-  const { user, profile, refreshProfile, logout } = useEmployeeAuth();
-  const { tenant } = useTenant();
+  const { user, profile, refreshProfile, logout, isLoading: authProfileLoading } = useEmployeeAuth();
+  const { tenant, setSubsidiaryHint } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [name, setName] = useState(profile?.name ?? '');
-  const [role, setRole] = useState(profile?.role ?? '');
-  const [department, setDepartment] = useState(profile?.department ?? '');
-  const [subsidiaryId, setSubsidiaryId] = useState(profile?.subsidiary_id ?? '');
-  const [hierarchyLevel, setHierarchyLevel] = useState(profile?.hierarchy_level?.toString() ?? '');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
+  const [department, setDepartment] = useState('');
+  const [subsidiaryId, setSubsidiaryId] = useState('');
+  const [hierarchyLevel, setHierarchyLevel] = useState('');
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
+  const hydratedRef = useRef(false);
 
-  const needsCompletion = !profile?.profile_completed || !profile?.employee_id;
+  // Only decide after profile is loaded — never treat "profile still null" as incomplete.
+  const needsCompletion =
+    !authProfileLoading &&
+    !!user &&
+    (!profile?.profile_completed || !profile?.employee_id);
   const email = profile?.email ?? user?.email ?? '';
+  const userId = user?.id;
+
+  const ghcContext = isGhcOrgContext({
+    appraisalMode: tenant.appraisalMode,
+    subsidiaryId: subsidiaryId || (tenant.appraisalMode === 'ghc' ? GHC_SUBSIDIARY_ID : null),
+  });
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -70,41 +140,111 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     void loadOptions();
   }, []);
 
+  // Hydrate once from draft → profile → employee match. Never overwrite typed progress afterward.
   useEffect(() => {
-    if (!profile) return;
-    setName(profile.name ?? '');
-    setRole(profile.role ?? '');
-    setDepartment(profile.department ?? '');
-    setSubsidiaryId(profile.subsidiary_id ?? '');
-    setHierarchyLevel(profile.hierarchy_level?.toString() ?? '');
-  }, [profile]);
+    if (!needsCompletion || hydratedRef.current || loadingOptions) return;
 
-  useEffect(() => {
+    const draft = readDraft(userId);
     const matched = employees.find((employee) => employee.email?.trim().toLowerCase() === email.trim().toLowerCase());
-    if (!matched) return;
-    setName((current) => current || matched.name || '');
-    setRole((current) => current || matched.role || '');
-    setDepartment((current) => current || matched.department || '');
-    setSubsidiaryId((current) => current || matched.subsidiary_id || '');
-    setHierarchyLevel((current) => current || matched.hierarchy_level?.toString() || '');
-  }, [email, employees]);
+    const seedSubsidiary =
+      draft?.subsidiaryId ||
+      profile?.subsidiary_id ||
+      matched?.subsidiary_id ||
+      (tenant.appraisalMode === 'ghc' ? GHC_SUBSIDIARY_ID : '') ||
+      '';
+    const seedIsGhc = seedSubsidiary === GHC_SUBSIDIARY_ID || tenant.appraisalMode === 'ghc';
 
-  const departmentOptions = useMemo(
-    () => uniqueSorted([...employees.map((employee) => employee.department), ...FALLBACK_DEPARTMENTS]),
-    [employees],
-  );
+    const seedDepartment = draft?.department
+      || (seedIsGhc
+        ? pickCanonical(profile?.department ?? matched?.department, GHC_DEPARTMENTS)
+        : (profile?.department ?? matched?.department ?? ''));
+    const seedRole = draft?.role
+      || (seedIsGhc
+        ? pickCanonical(profile?.role ?? matched?.role, GHC_ROLES)
+        : (profile?.role ?? matched?.role ?? ''));
+    const seedLevel = draft?.hierarchyLevel
+      || (seedIsGhc
+        ? normalizeGhcLevelForForm(profile?.hierarchy_level ?? matched?.hierarchy_level)
+        : (profile?.hierarchy_level?.toString() ?? matched?.hierarchy_level?.toString() ?? ''));
 
-  const roleOptions = useMemo(
-    () => uniqueSorted([...employees.map((employee) => employee.role), ...FALLBACK_ROLES]),
-    [employees],
-  );
+    setName(draft?.name || profile?.name || matched?.name || '');
+    setSubsidiaryId(seedSubsidiary);
+    setDepartment(seedDepartment);
+    setRole(seedRole);
+    setHierarchyLevel(seedLevel);
+    hydratedRef.current = true;
+  }, [
+    needsCompletion,
+    loadingOptions,
+    userId,
+    email,
+    employees,
+    profile,
+    tenant.appraisalMode,
+  ]);
+
+  // Persist in-progress answers so leaving / refreshing does not wipe them.
+  useEffect(() => {
+    if (!needsCompletion || !hydratedRef.current || !userId) return;
+    writeDraft(userId, { name, role, department, subsidiaryId, hierarchyLevel });
+  }, [needsCompletion, userId, name, role, department, subsidiaryId, hierarchyLevel]);
+
+  const departmentOptions = useMemo(() => {
+    if (ghcContext) {
+      const extras = department && !GHC_DEPARTMENTS.includes(department as typeof GHC_DEPARTMENTS[number])
+        ? [department]
+        : [];
+      return [...extras, ...GHC_DEPARTMENTS];
+    }
+    return uniqueSorted([...employees.map((employee) => employee.department), ...FALLBACK_DEPARTMENTS]);
+  }, [employees, ghcContext, department]);
+
+  const roleOptions = useMemo(() => {
+    if (ghcContext) {
+      const extras = role && !GHC_ROLES.includes(role as typeof GHC_ROLES[number])
+        ? [role]
+        : [];
+      return [...extras, ...GHC_ROLES];
+    }
+    return uniqueSorted([...employees.map((employee) => employee.role), ...FALLBACK_ROLES]);
+  }, [employees, ghcContext, role]);
 
   const profileHierarchyLowerSenior = useMemo(
     () => subsidiaries.find((s) => s.id === subsidiaryId)?.hierarchy_lower_is_senior ?? false,
     [subsidiaries, subsidiaryId],
   );
 
+  const levelLabelOpts = {
+    appraisalMode: tenant.appraisalMode,
+    subsidiaryId: subsidiaryId || (tenant.appraisalMode === 'ghc' ? GHC_SUBSIDIARY_ID : null),
+  };
+
+  const levelOptions = useMemo(
+    () => hierarchyLevelOptions(levelLabelOpts),
+    [tenant.appraisalMode, subsidiaryId],
+  );
+
+  useEffect(() => {
+    if (!hydratedRef.current || !hierarchyLevel) return;
+    const n = Number(hierarchyLevel);
+    if (!levelOptions.includes(n)) {
+      setHierarchyLevel(ghcContext ? normalizeGhcLevelForForm(n) : '');
+    }
+  }, [hierarchyLevel, levelOptions, ghcContext]);
+
   const canSave = name.trim() && role.trim() && department.trim() && subsidiaryId && hierarchyLevel;
+
+  const handleCompanyChange = (nextSubsidiaryId: string) => {
+    setSubsidiaryId(nextSubsidiaryId);
+    // Live-switch branding/theme while completing profile (localhost / unpinned hosts only).
+    setSubsidiaryHint(nextSubsidiaryId);
+    const nextIsGhc = nextSubsidiaryId === GHC_SUBSIDIARY_ID || tenant.appraisalMode === 'ghc';
+    if (nextIsGhc) {
+      setDepartment((current) => pickCanonical(current, GHC_DEPARTMENTS) || current);
+      setRole((current) => pickCanonical(current, GHC_ROLES) || current);
+      setHierarchyLevel((current) => normalizeGhcLevelForForm(current ? Number(current) : null) || current);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,26 +253,51 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
       return;
     }
 
+    if (ghcContext) {
+      if (!pickCanonical(department, GHC_DEPARTMENTS)) {
+        toast.error('Please pick a GreenHouse Capital team from the list.');
+        return;
+      }
+      if (!pickCanonical(role, GHC_ROLES)) {
+        toast.error('Please pick a GreenHouse Capital role from the list.');
+        return;
+      }
+    }
+
     setSaving(true);
-    const { error } = await supabase.functions.invoke('complete-profile', {
+    const { data, error } = await supabase.functions.invoke('complete-profile', {
       body: {
         name,
-        role,
-        department,
+        role: pickCanonical(role, GHC_ROLES) || role,
+        department: pickCanonical(department, GHC_DEPARTMENTS) || department,
         subsidiary_id: subsidiaryId,
         hierarchy_level: Number(hierarchyLevel),
       },
     });
     setSaving(false);
 
-    if (error) {
-      toast.error(error.message || 'Profile could not be completed.');
+    const remoteError =
+      error?.message ||
+      (data && typeof data === 'object' && 'error' in data ? String((data as { error: unknown }).error) : null);
+
+    if (remoteError) {
+      toast.error(remoteError || 'Profile could not be completed.');
       return;
     }
 
+    clearDraft(userId);
+    hydratedRef.current = false;
     await refreshProfile();
     toast.success('Profile completed. You can now continue.');
   };
+
+  if (authProfileLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </main>
+    );
+  }
 
   if (!needsCompletion) return <>{children}</>;
 
@@ -151,7 +316,7 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
         <section className="flex items-center px-4 py-6 sm:px-8 lg:px-14">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto w-full max-w-xl">
             <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
-              <img src={vggLogo} alt="VGG" className="h-8 w-auto" />
+              <img src={brand.logoMark} alt={brand.logoAlt} className={brand.logoMarkClassName} />
               <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
             </div>
 
@@ -183,9 +348,9 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Subsidiary</Label>
-                    <Select value={subsidiaryId} onValueChange={setSubsidiaryId}>
-                      <SelectTrigger><SelectValue placeholder="Select subsidiary" /></SelectTrigger>
+                    <Label>Company</Label>
+                    <Select value={subsidiaryId || undefined} onValueChange={handleCompanyChange}>
+                      <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                       <SelectContent>
                         {subsidiaries.map((subsidiary) => <SelectItem key={subsidiary.id} value={subsidiary.id}>{subsidiary.name}</SelectItem>)}
                       </SelectContent>
@@ -193,45 +358,71 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="profile-department">Department</Label>
-                    <Input
-                      id="profile-department"
-                      list="department-options"
-                      value={department}
-                      onChange={(event) => setDepartment(event.target.value)}
-                      placeholder="Pick from list or type your own"
-                      maxLength={140}
-                      autoComplete="off"
-                    />
-                    <datalist id="department-options">
-                      {departmentOptions.map((option) => <option key={option} value={option} />)}
-                    </datalist>
+                    <Label htmlFor={ghcContext ? undefined : 'profile-department'}>{ghcContext ? 'Team' : 'Department'}</Label>
+                    {ghcContext ? (
+                      <Select value={department || undefined} onValueChange={setDepartment}>
+                        <SelectTrigger><SelectValue placeholder="Select team" /></SelectTrigger>
+                        <SelectContent>
+                          {departmentOptions.map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <>
+                        <Input
+                          id="profile-department"
+                          list="department-options"
+                          value={department}
+                          onChange={(event) => setDepartment(event.target.value)}
+                          placeholder="Pick from list or type your own"
+                          maxLength={140}
+                          autoComplete="off"
+                        />
+                        <datalist id="department-options">
+                          {departmentOptions.map((option) => <option key={option} value={option} />)}
+                        </datalist>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="profile-role">Role / title</Label>
-                    <Input
-                      id="profile-role"
-                      list="role-options"
-                      value={role}
-                      onChange={(event) => setRole(event.target.value)}
-                      placeholder="Pick from list or type your own"
-                      maxLength={140}
-                      autoComplete="off"
-                    />
-                    <datalist id="role-options">
-                      {roleOptions.map((option) => <option key={option} value={option} />)}
-                    </datalist>
+                    <Label htmlFor={ghcContext ? undefined : 'profile-role'}>Role / title</Label>
+                    {ghcContext ? (
+                      <Select value={role || undefined} onValueChange={setRole}>
+                        <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                        <SelectContent>
+                          {roleOptions.map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <>
+                        <Input
+                          id="profile-role"
+                          list="role-options"
+                          value={role}
+                          onChange={(event) => setRole(event.target.value)}
+                          placeholder="Pick from list or type your own"
+                          maxLength={140}
+                          autoComplete="off"
+                        />
+                        <datalist id="role-options">
+                          {roleOptions.map((option) => <option key={option} value={option} />)}
+                        </datalist>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label>Seniority level</Label>
-                    <Select value={hierarchyLevel} onValueChange={setHierarchyLevel}>
+                    <Select value={hierarchyLevel || undefined} onValueChange={setHierarchyLevel}>
                       <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                       <SelectContent>
-                        {HIERARCHY_LEVEL_VALUES.map((value) => (
+                        {levelOptions.map((value) => (
                           <SelectItem key={value} value={String(value)}>
-                            L{value} — {displayHierarchyLabel(value, profileHierarchyLowerSenior)}
+                            {displayHierarchyLabel(value, profileHierarchyLowerSenior, levelLabelOpts)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -240,7 +431,11 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
 
                   <div className="flex items-start gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
                     <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <p>Your confirmed details are used only to place reviews into the right subsidiary, department, and hierarchy pools. You can pick from the list or type your own value.</p>
+                    <p>
+                      {ghcContext
+                        ? 'Your answers are kept on this device until you save. Then they place you into the right GreenHouse Capital team, role, and seniority pool.'
+                        : 'Your answers are kept on this device until you save. They place reviews into the right company, department, and hierarchy pools.'}
+                    </p>
                   </div>
 
                   <Button type="submit" className="w-full" disabled={!canSave || saving}>

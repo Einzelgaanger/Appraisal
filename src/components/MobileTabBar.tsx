@@ -1,5 +1,6 @@
 import { ClipboardList, BarChart3, User } from 'lucide-react';
 import { useTenant } from '@/tenants/TenantContext';
+import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 
 export type MobileTab = 'survey' | 'dashboard' | 'growth' | 'rankings' | 'profile';
 
@@ -21,6 +22,7 @@ const ALL_TABS: { key: MobileTab; label: string; icon: React.ComponentType<{ cla
  */
 export default function MobileTabBar({ active, onChange }: MobileTabBarProps) {
   const { tenant } = useTenant();
+  const brand = getTenantBrandAssets(tenant);
   const tabs = tenant.capabilities.showRankings ? ALL_TABS : ALL_TABS.filter((t) => t.pilot);
   const cols = tabs.length;
   return (
@@ -50,7 +52,7 @@ export default function MobileTabBar({ active, onChange }: MobileTabBarProps) {
                 )}
                 {key === 'growth' ? (
                   <img
-                    src="/favicon.png"
+                    src={brand.faviconHref}
                     alt="Growth"
                     className="w-5 h-5 rounded-sm object-contain"
                   />

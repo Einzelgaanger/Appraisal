@@ -22,6 +22,7 @@ import MvpDemo from "./pages/MvpDemo";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 import { AppBootstrapSkeleton } from "@/components/shell/LoadingShells";
 import { TenantProvider, useTenant } from "@/tenants/TenantContext";
+import TenantSubsidiaryBridge from "@/tenants/TenantSubsidiaryBridge";
 
 const queryClient = new QueryClient();
 
@@ -40,9 +41,10 @@ function ProtectedEmployeeRoute({
   children: React.ReactNode;
   requireProfile?: boolean;
 }) {
-  const { isAuthenticated, isAuthLoading } = useEmployeeAuth();
+  const { isAuthenticated, isLoading } = useEmployeeAuth();
   const location = useLocation();
-  if (isAuthLoading) return <AppBootstrapSkeleton />;
+  // Wait for session + profile so we never flash the company/role gate for completed users.
+  if (isLoading) return <AppBootstrapSkeleton />;
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -52,6 +54,8 @@ function ProtectedEmployeeRoute({
 
 function EmployeeLoginRedirect() {
   const location = useLocation();
+  const { isLoading } = useEmployeeAuth();
+  if (isLoading) return <AppBootstrapSkeleton />;
   const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
   const target = from ? `${from.pathname}${from.search ?? ''}` : '/hub?tab=survey';
   return <Navigate to={target} replace />;
@@ -69,14 +73,14 @@ function AdminGate() {
 }
 
 function HomeRoute() {
-  const { isAuthenticated: isEmployee, isAuthLoading } = useEmployeeAuth();
-  if (isAuthLoading) return <AppBootstrapSkeleton />;
+  const { isAuthenticated: isEmployee, isLoading } = useEmployeeAuth();
+  if (isLoading) return <AppBootstrapSkeleton />;
   return isEmployee ? <Navigate to="/hub?tab=survey" replace /> : <Onboarding />;
 }
 
 function LoginRoute() {
-  const { isAuthenticated: isEmployee, isAuthLoading } = useEmployeeAuth();
-  if (isAuthLoading) return <AppBootstrapSkeleton />;
+  const { isAuthenticated: isEmployee, isLoading } = useEmployeeAuth();
+  if (isLoading) return <AppBootstrapSkeleton />;
   return isEmployee ? <EmployeeLoginRedirect /> : <EmployeeLogin />;
 }
 
@@ -134,9 +138,11 @@ const App = () => (
         >
           <TenantProvider>
             <EmployeeAuthProvider>
-              <AuthProvider>
-                <AppRoutes />
-              </AuthProvider>
+              <TenantSubsidiaryBridge>
+                <AuthProvider>
+                  <AppRoutes />
+                </AuthProvider>
+              </TenantSubsidiaryBridge>
             </EmployeeAuthProvider>
           </TenantProvider>
         </BrowserRouter>

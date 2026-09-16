@@ -62,8 +62,8 @@ export default function GhcAiAssistCard({
         <h3 className="text-sm font-semibold">AI draft assist</h3>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        AI can draft strengths, improvements, and evaluation narrative from evidence you paste. Humans still confirm every score —
-        HR requires evidence in all cases.
+        Structured draft scaffold from the evidence you paste (not a live model call in this build). Use it to shape
+        strengths, improvements, and narrative — you still confirm every score. HR requires evidence in all cases.
       </p>
       <Textarea value={context} onChange={(e) => setContext(e.target.value)} rows={8} />
       <Button disabled={busy} onClick={() => void run()} className="gap-2">

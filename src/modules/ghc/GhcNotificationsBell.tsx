@@ -82,7 +82,21 @@ export default function GhcNotificationsBell({
   const openItem = async (row: NotificationRow) => {
     if (row.is_unread) await markRead(row.id);
     setOpen(false);
-    if (row.href) navigate(row.href);
+    const type = row.event_type || '';
+    let href = row.href || '/hub?tenant=ghc&tab=survey&ghcTab=results';
+    if (
+      type.includes('monthly') ||
+      type.includes('evaluation') ||
+      type.includes('discussion') ||
+      type.includes('acknowledge')
+    ) {
+      const url = new URL(href, window.location.origin);
+      if (!url.searchParams.get('tenant')) url.searchParams.set('tenant', 'ghc');
+      url.searchParams.set('tab', url.pathname.includes('dashboard') ? 'dashboard' : 'survey');
+      if (!url.pathname.includes('dashboard')) url.searchParams.set('ghcTab', 'results');
+      href = `${url.pathname}?${url.searchParams.toString()}`;
+    }
+    navigate(href);
   };
 
   return (
