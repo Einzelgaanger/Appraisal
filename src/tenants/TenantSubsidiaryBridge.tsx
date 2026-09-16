@@ -15,10 +15,11 @@ function looksLikeGhcEmail(email: string | null | undefined): boolean {
  * Email domain is a fallback before profile.subsidiary_id is set.
  */
 export default function TenantSubsidiaryBridge({ children }: { children: ReactNode }) {
-  const { profile, user } = useEmployeeAuth();
+  const { profile, user, lockedTenantSlug } = useEmployeeAuth();
   const { setSubsidiaryHint } = useTenant();
 
   useEffect(() => {
+    if (lockedTenantSlug) return;
     if (profile?.subsidiary_id) {
       setSubsidiaryHint(profile.subsidiary_id);
       return;
@@ -29,7 +30,7 @@ export default function TenantSubsidiaryBridge({ children }: { children: ReactNo
       return;
     }
     setSubsidiaryHint(null);
-  }, [profile?.subsidiary_id, profile?.email, user?.email, setSubsidiaryHint]);
+  }, [lockedTenantSlug, profile?.subsidiary_id, profile?.email, user?.email, setSubsidiaryHint]);
 
   return <>{children}</>;
 }

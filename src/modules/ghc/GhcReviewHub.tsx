@@ -21,6 +21,7 @@ import {
 import { ENABLE_APP_AI } from '@/lib/featureFlags';
 import { ghcGetDirectory, ghcGetMyTasks, type GhcTaskRow } from './ghcApi';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
+import { useTenant } from '@/tenants/TenantContext';
 import GhcMonthlyReviewRunner from './GhcMonthlyReviewRunner';
 import Ghc360Runner from './Ghc360Runner';
 import GhcQuarterlyEvaluationRunner from './GhcQuarterlyEvaluationRunner';
@@ -45,6 +46,7 @@ interface Props {
 }
 
 export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin = false }: Props) {
+  const { tenant } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
   const periodQuarter = resolveQuarterPeriod(searchParams.get('ghcQuarter'));
   const periodMonth = resolveMonthPeriod(searchParams.get('ghcMonth'));
@@ -273,7 +275,7 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
                             <tr key={`${row.kind}-${row.subject_id}-${row.period}`} className="border-b border-border/40 last:border-0">
                               <td className="py-2.5 pr-3 font-medium">{row.subject_name}</td>
                               <td className="py-2.5 pr-3 hidden sm:table-cell text-xs text-muted-foreground">
-                                {displayHierarchyLabel(levelById[row.subject_id], true, { appraisalMode: 'ghc' })}
+                                {displayHierarchyLabel(levelById[row.subject_id], true, { appraisalMode: tenant.appraisalMode })}
                               </td>
                               <td className="py-2.5 pr-3 font-mono text-xs">{row.period}</td>
                               <td className="py-2.5 pr-3">{statusBadge(row.status)}</td>

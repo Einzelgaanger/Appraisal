@@ -31,6 +31,19 @@ export function getTenantBrandAssets(tenant: TenantConfig): TenantBrandAssets {
     };
   }
 
+  if (tenant.slug === 'vigipay') {
+    return {
+      logoMark: vggLogo,
+      logo: vggLogo,
+      faviconHref: '/favicon.png',
+      logoAlt: 'VigiPay',
+      logoMarkClassName: 'h-7 w-auto object-contain sm:h-8',
+      logoClassName: 'h-8 w-auto object-contain',
+      parentCredit: 'A Venture Garden Group company',
+      themeColor: '#0f2744',
+    };
+  }
+
   return {
     logoMark: vggLogo,
     logo: vggLogo,

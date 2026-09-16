@@ -90,22 +90,39 @@ Deno.serve(async (req) => {
 
     const { data: existingEmployee } = await admin
       .from("employees")
-      .select("id")
+      .select("id, locked_tenant_slug, subsidiary_id, vigipay_appraisal_active")
       .ilike("email", email)
       .maybeSingle();
 
     let employeeId = existingEmployee?.id as string | undefined;
+    const lockedSlug = typeof existingEmployee?.locked_tenant_slug === "string"
+      ? existingEmployee.locked_tenant_slug.trim().toLowerCase()
+      : "";
+    const lockedSubsidiaryId = lockedSlug === "vigipay"
+      ? "33333333-3333-3333-3333-333333333333"
+      : (existingEmployee?.subsidiary_id as string | undefined);
+    const effectiveSubsidiaryId = lockedSubsidiaryId || subsidiaryId;
 
     if (employeeId) {
+      const patch: Record<string, unknown> = {
+        name,
+        role,
+        department,
+        email,
+        hierarchy_level: hierarchyLevel,
+      };
+      if (!lockedSlug) {
+        patch.subsidiary_id = effectiveSubsidiaryId;
+      }
       const { error: employeeError } = await admin
         .from("employees")
-        .update({ name, role, department, subsidiary_id: subsidiaryId, hierarchy_level: hierarchyLevel, email })
+        .update(patch)
         .eq("id", employeeId);
       if (employeeError) throw employeeError;
     } else {
       const { data: newEmployee, error: employeeError } = await admin
         .from("employees")
-        .insert({ name, role, department, subsidiary_id: subsidiaryId, hierarchy_level: hierarchyLevel, email })
+        .insert({ name, role, department, subsidiary_id: effectiveSubsidiaryId, hierarchy_level: hierarchyLevel, email })
         .select("id")
         .single();
       if (employeeError) throw employeeError;
@@ -121,7 +138,7 @@ Deno.serve(async (req) => {
         name,
         role,
         department,
-        subsidiary_id: subsidiaryId,
+        subsidiary_id: effectiveSubsidiaryId,
         hierarchy_level: hierarchyLevel,
         employee_id: employeeId,
         profile_completed: true,

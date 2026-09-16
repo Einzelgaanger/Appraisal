@@ -1,4 +1,4 @@
-﻿/// <reference types="npm:@types/react@18.3.1" />
+/// <reference types="npm:@types/react@18.3.1" />
 
 import * as React from 'npm:react@18.3.1'
 
@@ -16,7 +16,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 
-const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://appraisal.vgg.app/vgg-logo.webp'
+const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://executive.vgg.tools/vgg-logo.webp'
 
 interface MagicLinkEmailProps {
   siteName: string
@@ -29,29 +29,29 @@ export const MagicLinkEmail = ({
 }: MagicLinkEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your secure login link for VGG 360Â° Appraisal</Preview>
+    <Preview>Your secure login link for VGG 360° Appraisal</Preview>
     <Body style={main}>
       <Container style={outerContainer}>
         <Section style={headerSection}>
           <Img src={LOGO_URL} alt="Venture Garden Group" width="140" height="auto" style={logo} />
         </Section>
         <Section style={contentSection}>
-          <Text style={eyebrow}>VGG 360Â° Appraisal / Secure Sign-In</Text>
+          <Text style={eyebrow}>VGG 360° Appraisal / Secure Sign-In</Text>
           <Heading style={h1}>Your sign-in link</Heading>
           <Text style={text}>
-            Click the button below to securely sign in to your VGG 360Â° Appraisal account. For security, this link is single-use and will expire shortly.
+            Click the button below to securely sign in to your VGG 360° Appraisal account. For security, this link is single-use and will expire shortly.
           </Text>
           <Section style={buttonContainer}>
             <Button style={button} href={confirmationUrl}>
               Sign In
             </Button>
           </Section>
-          <Text style={dividerText}>â€” or copy this link into your browser â€”</Text>
+          <Text style={dividerText}>— or copy this link into your browser —</Text>
           <Text style={urlText}>{confirmationUrl}</Text>
         </Section>
         <Hr style={hr} />
         <Text style={footer}>If you did not request this link, you can safely ignore this email.</Text>
-        <Text style={copyright}>Â© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
+        <Text style={copyright}>© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
       </Container>
     </Body>
   </Html>

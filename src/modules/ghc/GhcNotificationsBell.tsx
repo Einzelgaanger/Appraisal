@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/tenants/TenantContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -42,6 +43,8 @@ export default function GhcNotificationsBell({
   compact?: boolean;
 }) {
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const tenantSlug = tenant.slug === 'vigipay' ? 'vigipay' : 'ghc';
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [unread, setUnread] = useState(0);
@@ -83,7 +86,7 @@ export default function GhcNotificationsBell({
     if (row.is_unread) await markRead(row.id);
     setOpen(false);
     const type = row.event_type || '';
-    let href = row.href || '/hub?tenant=ghc&tab=survey&ghcTab=results';
+    let href = row.href || `/hub?tenant=${tenantSlug}&tab=survey&ghcTab=results`;
     if (
       type.includes('monthly') ||
       type.includes('evaluation') ||
@@ -91,7 +94,7 @@ export default function GhcNotificationsBell({
       type.includes('acknowledge')
     ) {
       const url = new URL(href, window.location.origin);
-      if (!url.searchParams.get('tenant')) url.searchParams.set('tenant', 'ghc');
+      url.searchParams.set('tenant', tenantSlug);
       url.searchParams.set('tab', url.pathname.includes('dashboard') ? 'dashboard' : 'survey');
       if (!url.pathname.includes('dashboard')) url.searchParams.set('ghcTab', 'results');
       href = `${url.pathname}?${url.searchParams.toString()}`;

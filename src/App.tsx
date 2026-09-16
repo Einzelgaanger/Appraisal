@@ -23,6 +23,7 @@ import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 import { AppBootstrapSkeleton } from "@/components/shell/LoadingShells";
 import { TenantProvider, useTenant } from "@/tenants/TenantContext";
 import TenantSubsidiaryBridge from "@/tenants/TenantSubsidiaryBridge";
+import TenantLockEnforcer from "@/tenants/TenantLockEnforcer";
 
 const queryClient = new QueryClient();
 
@@ -139,9 +140,11 @@ const App = () => (
           <TenantProvider>
             <EmployeeAuthProvider>
               <TenantSubsidiaryBridge>
+                <TenantLockEnforcer>
                 <AuthProvider>
                   <AppRoutes />
                 </AuthProvider>
+                </TenantLockEnforcer>
               </TenantSubsidiaryBridge>
             </EmployeeAuthProvider>
           </TenantProvider>

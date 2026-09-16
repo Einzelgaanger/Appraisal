@@ -20,12 +20,14 @@ import {
   displayHierarchyLabel,
   GHC_DEPARTMENTS,
   GHC_ROLES,
+  VIGIPAY_DEPARTMENTS,
   hierarchyLevelOptions,
   isGhcOrgContext,
+  isVigipayOrgContext,
 } from '@/lib/hierarchyConvention';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { GHC_SUBSIDIARY_ID } from '@/tenants/config';
+import { GHC_SUBSIDIARY_ID, VIGIPAY_SUBSIDIARY_ID } from '@/tenants/config';
 
 interface Subsidiary { id: string; name: string; hierarchy_lower_is_senior?: boolean; }
 interface EmployeeOption {
@@ -98,7 +100,7 @@ const clearDraft = (userId: string | undefined) => {
 };
 
 export default function ProfileCompletionGate({ children }: { children: ReactNode }) {
-  const { user, profile, refreshProfile, logout, isLoading: authProfileLoading } = useEmployeeAuth();
+  const { user, profile, refreshProfile, logout, isLoading: authProfileLoading, lockedTenantSlug } = useEmployeeAuth();
   const { tenant, setSubsidiaryHint } = useTenant();
   const brand = getTenantBrandAssets(tenant);
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([]);
@@ -120,10 +122,16 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
   const email = profile?.email ?? user?.email ?? '';
   const userId = user?.id;
 
+  const lockedToVigipay = lockedTenantSlug === 'vigipay' || tenant.appraisalMode === 'vigipay';
   const ghcContext = isGhcOrgContext({
     appraisalMode: tenant.appraisalMode,
     subsidiaryId: subsidiaryId || (tenant.appraisalMode === 'ghc' ? GHC_SUBSIDIARY_ID : null),
   });
+  const vigipayContext = isVigipayOrgContext({
+    appraisalMode: tenant.appraisalMode,
+    subsidiaryId: subsidiaryId || (lockedToVigipay ? VIGIPAY_SUBSIDIARY_ID : null),
+  });
+  const structuredOrg = ghcContext || vigipayContext;
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -146,13 +154,16 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
 
     const draft = readDraft(userId);
     const matched = employees.find((employee) => employee.email?.trim().toLowerCase() === email.trim().toLowerCase());
-    const seedSubsidiary =
+    const seedSubsidiary = lockedToVigipay
+      ? VIGIPAY_SUBSIDIARY_ID
+      : (
       draft?.subsidiaryId ||
       profile?.subsidiary_id ||
       matched?.subsidiary_id ||
       (tenant.appraisalMode === 'ghc' ? GHC_SUBSIDIARY_ID : '') ||
-      '';
+      '');
     const seedIsGhc = seedSubsidiary === GHC_SUBSIDIARY_ID || tenant.appraisalMode === 'ghc';
+    const seedIsVigipay = seedSubsidiary === VIGIPAY_SUBSIDIARY_ID || tenant.appraisalMode === 'vigipay';
 
     const seedDepartment = draft?.department
       || (seedIsGhc
@@ -163,7 +174,7 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
         ? pickCanonical(profile?.role ?? matched?.role, GHC_ROLES)
         : (profile?.role ?? matched?.role ?? ''));
     const seedLevel = draft?.hierarchyLevel
-      || (seedIsGhc
+      || ((seedIsGhc || seedIsVigipay)
         ? normalizeGhcLevelForForm(profile?.hierarchy_level ?? matched?.hierarchy_level)
         : (profile?.hierarchy_level?.toString() ?? matched?.hierarchy_level?.toString() ?? ''));
 
@@ -181,6 +192,7 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     employees,
     profile,
     tenant.appraisalMode,
+    lockedToVigipay,
   ]);
 
   // Persist in-progress answers so leaving / refreshing does not wipe them.
@@ -196,8 +208,14 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
         : [];
       return [...extras, ...GHC_DEPARTMENTS];
     }
+    if (vigipayContext) {
+      const extras = department && !VIGIPAY_DEPARTMENTS.includes(department as typeof VIGIPAY_DEPARTMENTS[number])
+        ? [department]
+        : [];
+      return [...extras, ...VIGIPAY_DEPARTMENTS];
+    }
     return uniqueSorted([...employees.map((employee) => employee.department), ...FALLBACK_DEPARTMENTS]);
-  }, [employees, ghcContext, department]);
+  }, [employees, ghcContext, vigipayContext, department]);
 
   const roleOptions = useMemo(() => {
     if (ghcContext) {
@@ -206,8 +224,17 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
         : [];
       return [...extras, ...GHC_ROLES];
     }
+    if (vigipayContext) {
+      const fromRoster = uniqueSorted(
+        employees
+          .filter((employee) => employee.subsidiary_id === VIGIPAY_SUBSIDIARY_ID)
+          .map((employee) => employee.role),
+      );
+      const extras = role && !fromRoster.includes(role) ? [role] : [];
+      return [...extras, ...fromRoster];
+    }
     return uniqueSorted([...employees.map((employee) => employee.role), ...FALLBACK_ROLES]);
-  }, [employees, ghcContext, role]);
+  }, [employees, ghcContext, vigipayContext, role]);
 
   const profileHierarchyLowerSenior = useMemo(
     () => subsidiaries.find((s) => s.id === subsidiaryId)?.hierarchy_lower_is_senior ?? false,
@@ -228,20 +255,23 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     if (!hydratedRef.current || !hierarchyLevel) return;
     const n = Number(hierarchyLevel);
     if (!levelOptions.includes(n)) {
-      setHierarchyLevel(ghcContext ? normalizeGhcLevelForForm(n) : '');
+      setHierarchyLevel(structuredOrg ? normalizeGhcLevelForForm(n) : '');
     }
-  }, [hierarchyLevel, levelOptions, ghcContext]);
+  }, [hierarchyLevel, levelOptions, structuredOrg]);
 
   const canSave = name.trim() && role.trim() && department.trim() && subsidiaryId && hierarchyLevel;
 
   const handleCompanyChange = (nextSubsidiaryId: string) => {
+    if (lockedToVigipay) return;
     setSubsidiaryId(nextSubsidiaryId);
-    // Live-switch branding/theme while completing profile (localhost / unpinned hosts only).
     setSubsidiaryHint(nextSubsidiaryId);
     const nextIsGhc = nextSubsidiaryId === GHC_SUBSIDIARY_ID || tenant.appraisalMode === 'ghc';
+    const nextIsVigipay = nextSubsidiaryId === VIGIPAY_SUBSIDIARY_ID || tenant.appraisalMode === 'vigipay';
     if (nextIsGhc) {
       setDepartment((current) => pickCanonical(current, GHC_DEPARTMENTS) || current);
       setRole((current) => pickCanonical(current, GHC_ROLES) || current);
+      setHierarchyLevel((current) => normalizeGhcLevelForForm(current ? Number(current) : null) || current);
+    } else if (nextIsVigipay) {
       setHierarchyLevel((current) => normalizeGhcLevelForForm(current ? Number(current) : null) || current);
     }
   };
@@ -263,13 +293,19 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
         return;
       }
     }
+    if (vigipayContext) {
+      if (!pickCanonical(department, VIGIPAY_DEPARTMENTS) && !VIGIPAY_DEPARTMENTS.some((d) => d.toLowerCase() === department.trim().toLowerCase())) {
+        toast.error('Please pick a VigiPay team from the list.');
+        return;
+      }
+    }
 
     setSaving(true);
     const { data, error } = await supabase.functions.invoke('complete-profile', {
       body: {
         name,
         role: pickCanonical(role, GHC_ROLES) || role,
-        department: pickCanonical(department, GHC_DEPARTMENTS) || department,
+        department: pickCanonical(department, VIGIPAY_DEPARTMENTS) || pickCanonical(department, GHC_DEPARTMENTS) || department,
         subsidiary_id: subsidiaryId,
         hierarchy_level: Number(hierarchyLevel),
       },
@@ -349,17 +385,21 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
 
                   <div className="space-y-2">
                     <Label>Company</Label>
+                    {lockedToVigipay ? (
+                      <Input value="VigiPay" readOnly className="bg-muted" />
+                    ) : (
                     <Select value={subsidiaryId || undefined} onValueChange={handleCompanyChange}>
                       <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                       <SelectContent>
                         {subsidiaries.map((subsidiary) => <SelectItem key={subsidiary.id} value={subsidiary.id}>{subsidiary.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={ghcContext ? undefined : 'profile-department'}>{ghcContext ? 'Team' : 'Department'}</Label>
-                    {ghcContext ? (
+                    <Label htmlFor={structuredOrg ? undefined : 'profile-department'}>{structuredOrg ? 'Team' : 'Department'}</Label>
+                    {structuredOrg ? (
                       <Select value={department || undefined} onValueChange={setDepartment}>
                         <SelectTrigger><SelectValue placeholder="Select team" /></SelectTrigger>
                         <SelectContent>
@@ -387,8 +427,8 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={ghcContext ? undefined : 'profile-role'}>Role / title</Label>
-                    {ghcContext ? (
+                    <Label htmlFor={structuredOrg ? undefined : 'profile-role'}>Role / title</Label>
+                    {structuredOrg ? (
                       <Select value={role || undefined} onValueChange={setRole}>
                         <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                         <SelectContent>
@@ -434,6 +474,8 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                     <p>
                       {ghcContext
                         ? 'Your answers are kept on this device until you save. Then they place you into the right GreenHouse Capital team, role, and seniority pool.'
+                        : vigipayContext
+                          ? 'Your company is locked to VigiPay. Team and title must match the VigiPay roster.'
                         : 'Your answers are kept on this device until you save. They place reviews into the right company, department, and hierarchy pools.'}
                     </p>
                   </div>

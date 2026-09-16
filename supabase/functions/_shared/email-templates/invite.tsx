@@ -1,4 +1,4 @@
-﻿/// <reference types="npm:@types/react@18.3.1" />
+/// <reference types="npm:@types/react@18.3.1" />
 
 import * as React from 'npm:react@18.3.1'
 
@@ -16,7 +16,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 
-const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://appraisal.vgg.app/vgg-logo.webp'
+const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://executive.vgg.tools/vgg-logo.webp'
 
 interface InviteEmailProps {
   siteName: string
@@ -31,29 +31,29 @@ export const InviteEmail = ({
 }: InviteEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>You've been invited to the VGG 360Â° Appraisal platform</Preview>
+    <Preview>You've been invited to the VGG 360° Appraisal platform</Preview>
     <Body style={main}>
       <Container style={outerContainer}>
         <Section style={headerSection}>
           <Img src={LOGO_URL} alt="Venture Garden Group" width="140" height="auto" style={logo} />
         </Section>
         <Section style={contentSection}>
-          <Text style={eyebrow}>VGG 360Â° Appraisal / Invitation</Text>
+          <Text style={eyebrow}>VGG 360° Appraisal / Invitation</Text>
           <Heading style={h1}>Your review workspace is ready</Heading>
           <Text style={text}>
-            You have been invited to join the VGG 360Â° Appraisal platform â€” our tool for structured peer and leadership feedback across the group. Click below to accept your invitation and set up your account.
+            You have been invited to join the VGG 360° Appraisal platform — our tool for structured peer and leadership feedback across the group. Click below to accept your invitation and set up your account.
           </Text>
           <Section style={buttonContainer}>
             <Button style={button} href={confirmationUrl}>
               Accept Invite
             </Button>
           </Section>
-          <Text style={dividerText}>â€” or copy this link into your browser â€”</Text>
+          <Text style={dividerText}>— or copy this link into your browser —</Text>
           <Text style={urlText}>{confirmationUrl}</Text>
         </Section>
         <Hr style={hr} />
         <Text style={footer}>If you were not expecting this invitation, you may safely ignore this email.</Text>
-        <Text style={copyright}>Â© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
+        <Text style={copyright}>© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
       </Container>
     </Body>
   </Html>

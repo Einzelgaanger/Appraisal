@@ -1,4 +1,4 @@
-﻿/// <reference types="npm:@types/react@18.3.1" />
+/// <reference types="npm:@types/react@18.3.1" />
 
 import * as React from 'npm:react@18.3.1'
 
@@ -15,7 +15,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 
-const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://appraisal.vgg.app/vgg-logo.webp'
+const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://executive.vgg.tools/vgg-logo.webp'
 
 interface ReauthenticationEmailProps {
   token: string
@@ -24,17 +24,17 @@ interface ReauthenticationEmailProps {
 export const ReauthenticationEmail = ({ token }: ReauthenticationEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your verification code for VGG 360Â° Appraisal</Preview>
+    <Preview>Your verification code for VGG 360° Appraisal</Preview>
     <Body style={main}>
       <Container style={outerContainer}>
         <Section style={headerSection}>
           <Img src={LOGO_URL} alt="Venture Garden Group" width="140" height="auto" style={logo} />
         </Section>
         <Section style={contentSection}>
-          <Text style={eyebrow}>VGG 360Â° Appraisal / Verification</Text>
+          <Text style={eyebrow}>VGG 360° Appraisal / Verification</Text>
           <Heading style={h1}>Verification code</Heading>
           <Text style={text}>
-            Please use the code below to verify your identity on the VGG 360Â° Appraisal platform. This code is time-sensitive and should not be shared with anyone.
+            Please use the code below to verify your identity on the VGG 360° Appraisal platform. This code is time-sensitive and should not be shared with anyone.
           </Text>
           <Section style={codeContainer}>
             <Text style={codeStyle}>{token}</Text>
@@ -43,7 +43,7 @@ export const ReauthenticationEmail = ({ token }: ReauthenticationEmailProps) => 
         </Section>
         <Hr style={hr} />
         <Text style={footer}>If you did not initiate this request, you can safely disregard this email.</Text>
-        <Text style={copyright}>Â© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
+        <Text style={copyright}>© {new Date().getFullYear()} Venture Garden Group. All rights reserved.</Text>
       </Container>
     </Body>
   </Html>

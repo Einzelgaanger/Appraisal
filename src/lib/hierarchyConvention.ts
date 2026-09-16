@@ -6,7 +6,7 @@
  */
 
 import { boomHierarchyLabel } from '@/lib/boomRoleLabels';
-import { GHC_SUBSIDIARY_ID } from '@/tenants/config';
+import { GHC_SUBSIDIARY_ID, VIGIPAY_SUBSIDIARY_ID } from '@/tenants/config';
 
 /** Legacy pool labels (higher number = more senior in org chart). */
 export const LEGACY_HIERARCHY_LABELS: Record<number, string> = {
@@ -57,21 +57,49 @@ export const GHC_HIERARCHY_LABELS: Record<number, string> = {
   3: 'Team member',
 };
 
+/** Official VigiPay teams from the returned onboarding roster. */
+export const VIGIPAY_DEPARTMENTS = [
+  'Compliance',
+  'Fidesic',
+  'Finance',
+  'General Manager',
+  'Growth',
+  'People Operations',
+  'Product',
+  'Strategy',
+  'Technology',
+  'Treasury Operations',
+] as const;
+
 export function isGhcOrgContext(options?: {
-  appraisalMode?: 'boom' | 'ghc' | 'legacy';
+  appraisalMode?: 'boom' | 'ghc' | 'vigipay' | 'legacy';
   subsidiaryId?: string | null;
 }): boolean {
   return options?.appraisalMode === 'ghc' || options?.subsidiaryId === GHC_SUBSIDIARY_ID;
 }
 
+export function isVigipayOrgContext(options?: {
+  appraisalMode?: 'boom' | 'ghc' | 'vigipay' | 'legacy';
+  subsidiaryId?: string | null;
+}): boolean {
+  return options?.appraisalMode === 'vigipay' || options?.subsidiaryId === VIGIPAY_SUBSIDIARY_ID;
+}
+
+export function isGhcStyleOrgContext(options?: {
+  appraisalMode?: 'boom' | 'ghc' | 'vigipay' | 'legacy';
+  subsidiaryId?: string | null;
+}): boolean {
+  return isGhcOrgContext(options) || isVigipayOrgContext(options);
+}
+
 export function displayHierarchyLabel(
   level: number | null | undefined,
   hierarchyLowerIsSenior: boolean,
-  options?: { appraisalMode?: 'boom' | 'ghc' | 'legacy'; subsidiaryId?: string | null },
+  options?: { appraisalMode?: 'boom' | 'ghc' | 'vigipay' | 'legacy'; subsidiaryId?: string | null },
 ): string {
   const l = level ?? 3;
 
-  if (isGhcOrgContext(options)) {
+  if (isGhcStyleOrgContext(options)) {
     if (l <= 1) return GHC_HIERARCHY_LABELS[1];
     if (l === 2) return GHC_HIERARCHY_LABELS[2];
     return GHC_HIERARCHY_LABELS[3];
@@ -83,10 +111,10 @@ export function displayHierarchyLabel(
 
 /** Levels offered on profile completion for a given company / tenant. */
 export function hierarchyLevelOptions(options?: {
-  appraisalMode?: 'boom' | 'ghc' | 'legacy';
+  appraisalMode?: 'boom' | 'ghc' | 'vigipay' | 'legacy';
   subsidiaryId?: string | null;
 }): number[] {
-  if (isGhcOrgContext(options)) return [1, 2, 3];
+  if (isGhcStyleOrgContext(options)) return [1, 2, 3];
   return [0, 1, 2, 3, 4, 5, 6, 7, 8];
 }
 

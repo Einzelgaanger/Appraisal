@@ -16,7 +16,7 @@ import {
   Text,
 } from 'npm:@react-email/components@0.0.22'
 
-const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://appraisal.vgg.app/vgg-logo.webp'
+const LOGO_URL = Deno.env.get('EMAIL_LOGO_URL') || 'https://executive.vgg.tools/vgg-logo.webp'
 
 interface RecoveryEmailProps {
   siteName: string

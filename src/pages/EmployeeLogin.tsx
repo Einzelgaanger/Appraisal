@@ -11,7 +11,7 @@ import { Lock, Mail, AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from 'luc
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { isGhcTenant } from '@/tenants/config';
+import { isGhcTenant, isGhcStyleAppraisal } from '@/tenants/config';
 
 export default function EmployeeLogin() {
   const { tenant } = useTenant();
@@ -30,14 +30,27 @@ export default function EmployeeLogin() {
     (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
   const afterLoginBase = returnTo ? `${returnTo.pathname}${returnTo.search ?? ''}` : '/hub?tab=survey';
 
-  const resolveAfterLogin = (loginEmail: string) => {
+  const resolveAfterLogin = async (loginEmail: string) => {
     try {
       const url = new URL(afterLoginBase, window.location.origin);
+      const normalized = loginEmail.trim().toLowerCase();
+      const { data: lockRow } = await supabase
+        .from('employees')
+        .select('locked_tenant_slug')
+        .ilike('email', normalized)
+        .maybeSingle();
+      const locked = (lockRow as { locked_tenant_slug?: string | null } | null)?.locked_tenant_slug?.trim().toLowerCase();
+      if (locked) {
+        url.searchParams.set('tenant', locked);
+        return `${url.pathname}${url.search}`;
+      }
       const isGhcEmail =
-        loginEmail.trim().toLowerCase().endsWith('@greenhouse.capital') ||
-        loginEmail.trim().toLowerCase().endsWith('@greenhousecapital.com');
+        normalized.endsWith('@greenhouse.capital') ||
+        normalized.endsWith('@greenhousecapital.com');
       if ((ghc || isGhcEmail) && !url.searchParams.get('tenant')) {
         url.searchParams.set('tenant', 'ghc');
+      } else if (isGhcStyleAppraisal(tenant) && !url.searchParams.get('tenant')) {
+        url.searchParams.set('tenant', tenant.slug);
       }
       return `${url.pathname}${url.search}`;
     } catch {
@@ -59,7 +72,7 @@ export default function EmployeeLogin() {
           setError('Sign-in succeeded but the session was not saved. Check that cookies/storage are allowed and try again.');
           return;
         }
-        window.location.assign(resolveAfterLogin(email));
+        window.location.assign(await resolveAfterLogin(email));
       }
     } catch {
       setError('An error occurred. Please try again.');

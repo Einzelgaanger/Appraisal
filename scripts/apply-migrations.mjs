@@ -25,15 +25,20 @@ function projectRef() {
   throw new Error('Could not resolve project ref');
 }
 
-function databaseUrl() {
-  if (process.env.DATABASE_URL?.trim()) return process.env.DATABASE_URL.trim();
+function candidateUrls() {
+  if (process.env.DATABASE_URL?.trim()) return [process.env.DATABASE_URL.trim()];
   const password = process.env.SUPABASE_DB_PASSWORD?.trim();
   if (!password) {
     console.error('Missing SUPABASE_DB_PASSWORD or DATABASE_URL in .env');
     process.exit(1);
   }
   const ref = projectRef();
-  return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
+  const encoded = encodeURIComponent(password);
+  return [
+    `postgresql://postgres.${ref}:${encoded}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`,
+    `postgresql://postgres.${ref}:${encoded}@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`,
+    `postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres`,
+  ];
 }
 
 function migrationVersion(filename) {
@@ -58,13 +63,23 @@ async function appliedVersions(client) {
   return new Set(rows.map((r) => r.version));
 }
 
-const client = new Client({
-  connectionString: databaseUrl(),
-  ssl: { rejectUnauthorized: false },
-});
-
-await client.connect();
-console.log('Connected to database');
+let client = null;
+for (const url of candidateUrls()) {
+  const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  try {
+    await c.connect();
+    console.log('Connected to database');
+    client = c;
+    break;
+  } catch (e) {
+    console.log('Connect failed', e.code || e.message);
+    try { await c.end(); } catch { /* ignore */ }
+  }
+}
+if (!client) {
+  console.error('Could not connect to Postgres (tried pooler + direct).');
+  process.exit(1);
+}
 
 try {
   await ensureMigrationsTable(client);

@@ -51,7 +51,7 @@ import { fetchMyAggregatedPeer360Scores, fetchMy360Dashboard, fetchOrgPerformanc
 import { fetchMyEaQuarterlyResults, type EaQuarterlyResults } from '@/lib/boomEaQuarterly';
 import { isMeaningfulQualitativeAnswer } from '@/lib/qualitativeFeedback';
 import EaQuarterlyDashboardCard from '@/components/employee-dashboard/EaQuarterlyDashboardCard';
-import { isBoomTenant, isGhcTenant } from '@/tenants/config';
+import { isBoomTenant, isGhcStyleAppraisal } from '@/tenants/config';
 import { useTenant } from '@/tenants/TenantContext';
 
 interface FeedbackItem {
@@ -93,21 +93,21 @@ export default function EmployeeHub() {
   const showRankings = tenant.capabilities.showRankings;
   const showGrowthHub = tenant.capabilities.showGrowthHub;
   const boomMode = isBoomTenant(tenant);
-  const ghcMode = isGhcTenant(tenant);
+  const ghcMode = isGhcStyleAppraisal(tenant);
 
-  // Keep shareable URLs on GHC once the signed-in company resolves to GreenHouse Capital.
+  // Keep shareable URLs on the GHC-style tenant (GHC or VigiPay).
   useEffect(() => {
     if (!ghcMode) return;
-    if (searchParams.get('tenant')) return;
+    if (searchParams.get('tenant') === tenant.slug) return;
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        next.set('tenant', 'ghc');
+        next.set('tenant', tenant.slug);
         return next;
       },
       { replace: true },
     );
-  }, [ghcMode, searchParams, setSearchParams]);
+  }, [ghcMode, tenant.slug, searchParams, setSearchParams]);
 
   // Survey state
   const [step, setStep] = useState<'subsidiary' | 'employee' | 'questions' | 'submitted'>('subsidiary');
@@ -1385,7 +1385,7 @@ export default function EmployeeHub() {
                 <div className="flex items-start gap-3">
                   <img src={brand.logoMark} alt={brand.logoAlt} className="h-10 w-auto object-contain" />
                   <div>
-                    <h3 className="text-sm font-semibold">GreenHouse Capital growth</h3>
+                    <h3 className="text-sm font-semibold">{tenant.branding.fullName} growth</h3>
                     <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
                       Growth plans live inside quarterly evaluations (improvement goals) and monthly manager reviews
                       (OKRs, fulfilment, development notes). Open Appraisal → My results for your culture radar and

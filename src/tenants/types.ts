@@ -1,6 +1,6 @@
 export type TenantModule = 'appraisal';
 
-export type AppraisalMode = 'boom' | 'ghc' | 'legacy';
+export type AppraisalMode = 'boom' | 'ghc' | 'vigipay' | 'legacy';
 
 export interface TenantCapabilities {
   showDemoRoute: boolean;

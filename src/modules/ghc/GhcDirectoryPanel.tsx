@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { ghcGetDirectory } from './ghcApi';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
+import { useTenant } from '@/tenants/TenantContext';
 
 type Row = {
   id: string;
@@ -27,6 +28,7 @@ export default function GhcDirectoryPanel({
   periodMonth: string;
   viewerEmployeeId?: string | null;
 }) {
+  const { tenant } = useTenant();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlyReports, setOnlyReports] = useState(false);
@@ -106,7 +108,7 @@ export default function GhcDirectoryPanel({
                 </td>
                 <td className="py-2 pr-3 hidden sm:table-cell text-xs text-muted-foreground">{r.role ?? '—'}</td>
                 <td className="py-2 pr-3 text-xs text-muted-foreground">
-                  {displayHierarchyLabel(r.hierarchy_level, true, { appraisalMode: 'ghc' })}
+                  {displayHierarchyLabel(r.hierarchy_level, true, { appraisalMode: tenant.appraisalMode })}
                 </td>
                 <td className="py-2 pr-3">
                   <Badge variant={r.monthly_done ? 'default' : 'outline'} className="text-[10px]">

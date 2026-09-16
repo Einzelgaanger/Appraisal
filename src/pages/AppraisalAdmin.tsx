@@ -26,7 +26,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
 } from 'recharts';
-import { isBoomTenant, isGhcTenant } from '@/tenants/config';
+import { isBoomTenant, isGhcStyleAppraisal } from '@/tenants/config';
 import { useTenant } from '@/tenants/TenantContext';
 import GhcAdminMonitor from '@/modules/ghc/GhcAdminMonitor';
 
@@ -98,7 +98,7 @@ export default function AppraisalAdmin() {
   const [chatOpen, setChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const boomMode = isBoomTenant(tenant);
-  const ghcMode = isGhcTenant(tenant);
+  const ghcMode = isGhcStyleAppraisal(tenant);
   const [adminTab, setAdminTab] = useState(boomMode || ghcMode ? 'boom' : 'overview');
   const [boomResponses, setBoomResponses] = useState<BoomResponseRow[]>([]);
   const [boomAnswers, setBoomAnswers] = useState<BoomAnswerRow[]>([]);

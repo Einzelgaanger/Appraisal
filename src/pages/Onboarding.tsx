@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, ArrowRight, Search, KeyRound } from 'lucide-react';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { isGhcTenant } from '@/tenants/config';
+import { isGhcTenant, isVigipayTenant, PRODUCTION_TENANT_HOSTS } from '@/tenants/config';
 import heroFeedbackSession from '@/assets/hero-feedback-session.jpg';
 import heroReflectionData from '@/assets/hero-reflection-data.jpg';
 import heroTeam from '@/assets/hero-team-mobile.jpg';
@@ -84,9 +84,41 @@ const GHC_SLIDES: SlideDef[] = [
     kicker: 'Sign in securely',
     headlineHTML: 'Your GHC login. <em>Your workspace.</em>',
     body:
-      'Sign in with your GreenHouse Capital email. Use Find my account if you still need to activate. Live host: ghc.vgg.app.',
+      `Sign in with your GreenHouse Capital email. Use Find my account if you still need to activate. Live host: ${PRODUCTION_TENANT_HOSTS.ghc}.`,
     image: heroReflectionData,
     caption: 'Fig. 03 — Secure GHC access',
+  },
+];
+
+const VIGIPAY_SLIDES: SlideDef[] = [
+  {
+    no: '01',
+    label: 'Overview',
+    kicker: 'VigiPay appraisal',
+    headlineHTML: 'Monthly, 360, and <em>formal quarterly evals.</em>',
+    body:
+      'VigiPay uses the same instruments as GreenHouse Capital for now: manager monthly reviews, anonymous peer 360 inside VigiPay, and scored quarterly evaluations. Reporting lines follow the VigiPay work-manager map.',
+    image: heroTeam,
+    caption: 'Fig. 01 — VigiPay appraisal workspace',
+  },
+  {
+    no: '02',
+    label: 'Inside the hub',
+    kicker: 'Tasks · Results · Directory · Monitor',
+    headlineHTML: 'Your VigiPay line. <em>Not GHC.</em>',
+    body:
+      'Managers review their mapped reports. Peer 360 stays inside the VigiPay roster. People Ops / GM release results. Forms will be swapped when VigiPay sends its own spec.',
+    image: heroFeedbackSession,
+    caption: 'Fig. 02 — VigiPay reviews and results',
+  },
+  {
+    no: '03',
+    label: 'Access',
+    kicker: 'Sign in securely',
+    headlineHTML: 'You are locked to <em>this workspace.</em>',
+    body: `VigiPay people always land here, even with a VGG email. Live host: ${PRODUCTION_TENANT_HOSTS.vigipay}.`,
+    image: heroReflectionData,
+    caption: 'Fig. 03 — Secure VigiPay access',
   },
 ];
 
@@ -94,7 +126,8 @@ export default function Onboarding() {
   const { tenant } = useTenant();
   const brand = getTenantBrandAssets(tenant);
   const ghc = isGhcTenant(tenant);
-  const slides = ghc ? GHC_SLIDES : EO_SLIDES;
+  const vigipay = isVigipayTenant(tenant);
+  const slides = vigipay ? VIGIPAY_SLIDES : ghc ? GHC_SLIDES : EO_SLIDES;
   const [slide, setSlide] = useState(0);
   const navigate = useNavigate();
 
@@ -115,14 +148,23 @@ export default function Onboarding() {
           <img src={brand.logoMark} alt={brand.logoAlt} className="h-7 w-auto sm:h-8 object-contain" />
           <div className="hidden h-5 w-px bg-border sm:block" />
           <span className="font-mono hidden sm:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-            {ghc ? 'GreenHouse Capital · Appraisal' : 'VGG / BOOM — EO Appraisal'}
+            {ghc ? 'GreenHouse Capital · Appraisal' : vigipay ? 'VigiPay · Appraisal' : 'VGG / BOOM — EO Appraisal'}
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="font-mono hidden lg:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-            {ghc ? 'GHC · 2026' : 'BOOM v2 · 2026'}
+            {ghc ? 'GHC · 2026' : vigipay ? 'VigiPay · 2026' : 'BOOM v2 · 2026'}
           </span>
-          <Button variant="green" size="sm" className="h-8 px-3 text-xs" onClick={() => navigate(ghc ? '/login?tenant=ghc' : '/login')}>
+          <Button
+            variant="green"
+            size="sm"
+            className="h-8 px-3 text-xs"
+            onClick={() =>
+              navigate(
+                vigipay ? '/login?tenant=vigipay' : ghc ? '/login?tenant=ghc' : '/login',
+              )
+            }
+          >
             Sign In
           </Button>
         </div>

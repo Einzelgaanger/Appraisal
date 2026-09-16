@@ -23,6 +23,10 @@ interface EmployeeAuthContextType {
   profile: Profile | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  /** Company-scoped admin (VigiPay People Ops / GM) — not global platform admin. */
+  isCompanyAdmin: boolean;
+  /** Employee row lock: this person always uses this tenant slug. */
+  lockedTenantSlug: string | null;
   /** True until initial session read completes — use for route guards */
   isAuthLoading: boolean;
   /** True while profile/admin role is loading after sign-in */
@@ -41,6 +45,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
+  const [lockedTenantSlug, setLockedTenantSlug] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -70,6 +76,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setProfile(null);
         setIsAdmin(false);
+        setIsCompanyAdmin(false);
+        setLockedTenantSlug(null);
         setProfileLoading(false);
         return;
       }
@@ -95,7 +103,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       if (resolvedProfile && !resolvedProfile.employee_id && normalizedEmail) {
         const { data: employeeData } = await supabase
           .from('employees')
-          .select('id, department')
+          .select('id, department, locked_tenant_slug, company_admin')
           .ilike('email', normalizedEmail)
           .maybeSingle();
 
@@ -119,7 +127,23 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return;
       setProfile(resolvedProfile);
-      setIsAdmin(!!roleData);
+
+      let companyAdmin = false;
+      let lock: string | null = null;
+      if (resolvedProfile?.employee_id) {
+        const { data: empLock } = await supabase
+          .from('employees')
+          .select('locked_tenant_slug, company_admin')
+          .eq('id', resolvedProfile.employee_id)
+          .maybeSingle();
+        const row = empLock as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
+        companyAdmin = !!row?.company_admin;
+        lock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
+      }
+      if (cancelled) return;
+      setIsCompanyAdmin(companyAdmin);
+      setLockedTenantSlug(lock);
+      setIsAdmin(!!roleData || companyAdmin);
       setProfileLoading(false);
     };
 
@@ -137,8 +161,23 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle(),
     ]);
-    setProfile(profileData as Profile | null);
-    setIsAdmin(!!roleData);
+    const nextProfile = profileData as Profile | null;
+    setProfile(nextProfile);
+    let companyAdmin = false;
+    let lock: string | null = null;
+    if (nextProfile?.employee_id) {
+      const { data: empLock } = await supabase
+        .from('employees')
+        .select('locked_tenant_slug, company_admin')
+        .eq('id', nextProfile.employee_id)
+        .maybeSingle();
+      const row = empLock as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
+      companyAdmin = !!row?.company_admin;
+      lock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
+    }
+    setIsCompanyAdmin(companyAdmin);
+    setLockedTenantSlug(lock);
+    setIsAdmin(!!roleData || companyAdmin);
     setProfileLoading(false);
   };
 
@@ -159,6 +198,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
+    setIsCompanyAdmin(false);
+    setLockedTenantSlug(null);
     setProfileLoading(false);
   };
 
@@ -181,6 +222,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
         user, session, profile,
         isAuthenticated: !!session,
         isAdmin,
+        isCompanyAdmin,
+        lockedTenantSlug,
         isAuthLoading: !authReady,
         isLoading: !authReady || profileLoading,
         refreshProfile,
