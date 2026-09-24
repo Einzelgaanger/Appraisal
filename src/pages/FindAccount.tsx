@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeAuth } from '@/contexts/EmployeeAuthContext';
@@ -13,7 +13,7 @@ import {
 import heroTeam from '@/assets/hero-team-mobile.jpg';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { isGhcTenant } from '@/tenants/config';
+import { isGhcStyleAppraisal } from '@/tenants/config';
 
 interface EmployeeResult {
   id: string;
@@ -34,11 +34,21 @@ const normalizeSearchText = (value: string) =>
 
 const compactSearchText = (value: string) => value.replace(/[^a-z0-9]/g, '');
 const EMPLOYEE_FETCH_BATCH = 1000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Who we are about to email. `name` is absent when the address was typed in directly. */
+interface PendingReset {
+  email: string;
+  name: string | null;
+}
 
 export default function FindAccount() {
   const { tenant } = useTenant();
+  const [searchParams] = useSearchParams();
+  // Reached from "Forgot password?" rather than from first-time activation.
+  const resetMode = searchParams.get('mode') === 'reset';
   const brand = getTenantBrandAssets(tenant);
-  const ghc = isGhcTenant(tenant);
+  const ghc = isGhcStyleAppraisal(tenant);
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<EmployeeResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -115,8 +125,10 @@ export default function FindAccount() {
     return () => clearTimeout(timeout);
   }, [searchQuery, fetchEmployeeIndex]);
 
-  const [confirmEmployee, setConfirmEmployee] = useState<EmployeeResult | null>(null);
+  const [pendingReset, setPendingReset] = useState<PendingReset | null>(null);
   const query = searchQuery.trim();
+  const typedEmail = query.toLowerCase();
+  const queryIsEmail = EMAIL_PATTERN.test(typedEmail);
 
   const handleSelectEmployee = (employee: EmployeeResult) => {
     if (!employee.email) {
@@ -124,23 +136,27 @@ export default function FindAccount() {
       return;
     }
     setError('');
-    setConfirmEmployee(employee);
+    setPendingReset({ email: employee.email, name: employee.name });
   };
 
   const handleConfirmSendReset = async () => {
-    if (!confirmEmployee?.email) return;
+    if (!pendingReset) return;
     setSending(true);
     setError('');
     try {
-      const { error } = await resetPassword(confirmEmployee.email);
+      const { error } = await resetPassword(pendingReset.email);
       if (error) throw new Error(error);
       setSent(true);
-      setSentTo(confirmEmployee.email.replace(/(.{3})(.*)(@.*)/, '$1***$3'));
-    } catch {
-      setError('Failed to send reset email. Please try again.');
+      setSentTo(pendingReset.email.replace(/(.{3})(.*)(@.*)/, '$1***$3'));
+    } catch (err) {
+      // Show the real reason — a throttled request otherwise looks the same as a
+      // genuine failure, and both look the same as success to the person waiting.
+      setError(err instanceof Error && err.message
+        ? err.message
+        : 'Failed to send reset email. Please try again.');
     } finally {
       setSending(false);
-      setConfirmEmployee(null);
+      setPendingReset(null);
     }
   };
 
@@ -178,15 +194,17 @@ export default function FindAccount() {
           </motion.div>
           <h1 className="text-xl font-semibold font-serif mb-1.5">Check your email</h1>
           <p className="text-muted-foreground text-[13px] mb-1">
-            We've sent an activation link to
+            {resetMode ? "We've sent a password reset link to" : "We've sent an activation link to"}
           </p>
           <p className="text-foreground font-semibold text-[13px] mb-5 break-all">{sentTo}</p>
           <div className="space-y-2 text-left bg-muted/50 rounded-md p-3.5 mb-6">
             <p className="text-[11px] font-semibold text-foreground mb-1.5">What happens next:</p>
             <ol className="text-[11px] text-muted-foreground space-y-1.5 list-decimal list-inside">
-              <li>Open the email and tap the activation link</li>
+              <li>Open the email and tap the link</li>
               <li>Set your new password</li>
-              <li>Confirm your profile details, then start your appraisals</li>
+              {resetMode
+                ? <li>Sign in and pick up where you left off</li>
+                : <li>Confirm your profile details, then start your appraisals</li>}
             </ol>
           </div>
           <Button onClick={() => navigate('/login')} className="w-full h-11 rounded-md text-sm">
@@ -205,7 +223,7 @@ export default function FindAccount() {
       <div className="mobile-hero shrink-0 max-h-[24vh]">
         <img src={heroTeam} alt="A team in collaboration" />
         <div className="mobile-hero-caption">
-          <span>{ghc ? '◉ GreenHouse Capital — Account' : '◉ VGG / BOOM — Account'}</span>
+          <span>{ghc ? `◉ ${tenant.branding.fullName} — Account` : '◉ VGG / BOOM — Account'}</span>
           <span>Auth / 03</span>
         </div>
       </div>
@@ -226,13 +244,24 @@ export default function FindAccount() {
           className="w-full max-w-md mobile-flow-card"
         >
           <div className="mb-4">
-            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 object-contain" />
-            <h1 className="text-xl font-semibold mb-1">Activate your account</h1>
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 rounded-md object-contain" />
+            <h1 className="text-xl font-semibold mb-1">
+              {resetMode ? 'Reset your password' : 'Activate your account'}
+            </h1>
             <p className="text-muted-foreground text-[13px] leading-relaxed">
-              Find your name below — we&apos;ll email you a link to set your password and complete your profile. Then you can
-              access {ghc
-                ? 'GreenHouse Capital appraisal tasks (monthly reviews, peer 360, quarterly evaluations)'
-                : 'BOOM assessments (peer 360, executive self, monthly reflection)'} from the hub.
+              {resetMode ? (
+                <>
+                  Enter your work email or find your name below, and we&apos;ll send you a link to set a
+                  new password. The link works once and expires shortly after.
+                </>
+              ) : (
+                <>
+                  Find your name below — we&apos;ll email you a link to set your password and complete your profile. Then you can
+                  access {ghc
+                    ? `${tenant.branding.fullName} appraisal tasks (monthly reviews, peer 360, quarterly evaluations)`
+                    : 'BOOM assessments (peer 360, executive self, monthly reflection)'} from the hub.
+                </>
+              )}
             </p>
           </div>
 
@@ -268,6 +297,31 @@ export default function FindAccount() {
             ) : (
               <p className="mt-2 text-[11px] text-muted-foreground">Tap your profile and we'll email you a link to set your password.</p>
             )}
+
+            {/*
+              Not everyone can find themselves in the directory — a missing record or
+              a name spelt differently would otherwise be a dead end. Anyone who
+              knows their work email can send the link straight to it.
+            */}
+            {queryIsEmail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setPendingReset({ email: typedEmail, name: null });
+                }}
+                disabled={sending}
+                className="mt-2.5 flex w-full items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 p-2.5 text-left transition-colors hover:bg-primary/10 disabled:opacity-50"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+                  <span className="truncate text-[11px] text-foreground">
+                    Email the link straight to <span className="font-semibold">{typedEmail}</span>
+                  </span>
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+              </button>
+            )}
           </div>
 
         {error && (
@@ -293,7 +347,9 @@ export default function FindAccount() {
             >
               <Search className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-[13px] text-muted-foreground">No matching employees found.</p>
-              <p className="text-[11px] text-muted-foreground mt-1">Try a different spelling or use your email address.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Try a different spelling, or type your work email above to have the link sent straight to it.
+              </p>
             </motion.div>
           )}
 
@@ -306,7 +362,8 @@ export default function FindAccount() {
               className="space-y-2"
             >
               <p className="text-[11px] text-muted-foreground font-medium mb-2.5">
-                {results.length} result{results.length !== 1 ? 's' : ''} — pick your profile to receive your activation email:
+                {results.length} result{results.length !== 1 ? 's' : ''} — pick your profile to receive your{' '}
+                {resetMode ? 'password reset email' : 'activation email'}:
               </p>
               {query.length > 0 && (
                 <p className="mb-2.5 text-[11px] text-foreground/70">
@@ -354,13 +411,13 @@ export default function FindAccount() {
 
         {/* Confirmation Dialog */}
         <AnimatePresence>
-          {confirmEmployee && (
+          {pendingReset && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm px-3 pb-3 sm:items-center sm:px-4 sm:pb-0"
-              onClick={() => !sending && setConfirmEmployee(null)}
+              onClick={() => !sending && setPendingReset(null)}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -369,34 +426,46 @@ export default function FindAccount() {
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-sm bg-card border border-border rounded-xl p-4 shadow-xl sm:rounded-sm"
               >
-                <h2 className="text-base font-semibold mb-1">Is this you?</h2>
+                <h2 className="text-base font-semibold mb-1">
+                  {pendingReset.name ? 'Is this you?' : 'Send the link here?'}
+                </h2>
                 <p className="text-[13px] text-muted-foreground mb-4">
-                  We'll send a secure link to this email so you can set your new password and complete your profile.
+                  {resetMode
+                    ? "We'll send a secure link to this email so you can set a new password."
+                    : "We'll send a secure link to this email so you can set your new password and complete your profile."}
                 </p>
                 <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border mb-4">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-semibold text-primary">
-                      {confirmEmployee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </span>
+                    {pendingReset.name ? (
+                      <span className="text-xs font-semibold text-primary">
+                        {pendingReset.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </span>
+                    ) : (
+                      <Mail className="h-3.5 w-3.5 text-primary" />
+                    )}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-[13px] truncate">{confirmEmployee.name}</p>
-                    {confirmEmployee.email && (
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
-                        <Mail className="w-3 h-3 flex-shrink-0" />
-                        <span className="truncate">{confirmEmployee.email.replace(/(.{3})(.*)(@.*)/, '$1***$3')}</span>
-                      </p>
+                    {pendingReset.name && (
+                      <p className="font-medium text-[13px] truncate">{pendingReset.name}</p>
                     )}
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                      {pendingReset.name && <Mail className="w-3 h-3 flex-shrink-0" />}
+                      <span className="truncate">
+                        {pendingReset.name
+                          ? pendingReset.email.replace(/(.{3})(.*)(@.*)/, '$1***$3')
+                          : pendingReset.email}
+                      </span>
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:gap-2.5">
                   <Button
                     variant="outline"
                     className="w-full h-11 text-sm sm:flex-1"
-                    onClick={() => setConfirmEmployee(null)}
+                    onClick={() => setPendingReset(null)}
                     disabled={sending}
                   >
-                    Not me
+                    {pendingReset.name ? 'Not me' : 'Cancel'}
                   </Button>
                   <Button
                     className="w-full h-11 text-sm sm:flex-1"

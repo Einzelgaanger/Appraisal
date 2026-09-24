@@ -28,10 +28,10 @@ export function isBoomOversightViewer(
 }
 
 export const DISCUSSION_FORM_LABELS: Record<string, string> = {
-  monthly_self: 'Monthly self-assessment',
+  monthly_self: 'Monthly self check-in',
   executive: 'Executive assessment',
   ea_quarterly: 'EA quarterly evaluation',
-  peer_360: '360 Peer review',
+  peer_360: '360 peer review (chat with manager)',
 };
 
 export function discussionThreadTitle(

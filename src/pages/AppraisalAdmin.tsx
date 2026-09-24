@@ -624,8 +624,8 @@ ${feedbackSample || '• No text feedback yet'}`;
                 <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Hub</span>
               </Button>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold text-primary">GHC Appraisal Monitor</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">GreenHouse Capital completion, releases, and partner actions</p>
+                <h1 className="text-base sm:text-lg font-bold text-primary">{tenant.branding.shortName} Appraisal Monitor</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">{tenant.branding.fullName} completion, releases, and partner actions</p>
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>

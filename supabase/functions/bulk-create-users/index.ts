@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { requireGlobalAdmin } from "../_shared/require-admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +11,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Creates confirmed accounts with a caller-supplied password, so it has to be
+    // an administrator asking.
+    const gate = await requireGlobalAdmin(req, corsHeaders);
+    if (!gate.ok) return gate.response;
+    const supabaseAdmin = gate.admin;
+
     const { users, default_password } = await req.json();
 
     if (!users || !Array.isArray(users) || !default_password) {
@@ -20,13 +26,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify caller is admin
-    const authHeader = req.headers.get("Authorization");
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    console.log("Bulk user creation requested", { by: gate.callerEmail, count: users.length });
 
     const results = { created: 0, skipped: 0, errors: [] as string[] };
 

@@ -120,7 +120,7 @@ export default function GhcNotificationsBell({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <div className="border-b border-border px-3 py-2 text-xs font-semibold">GHC notifications</div>
+        <div className="border-b border-border px-3 py-2 text-xs font-semibold">{tenant.branding.fullName} notifications</div>
         <div className="max-h-80 overflow-y-auto">
           {loading && rows.length === 0 ? (
             <p className="p-4 text-xs text-muted-foreground">Loading…</p>

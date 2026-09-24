@@ -17,6 +17,7 @@ export default function EmployeeLogin() {
   const { tenant } = useTenant();
   const brand = getTenantBrandAssets(tenant);
   const ghc = isGhcTenant(tenant);
+  const brandedLogin = isGhcStyleAppraisal(tenant);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,6 +30,15 @@ export default function EmployeeLogin() {
   const returnTo =
     (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
   const afterLoginBase = returnTo ? `${returnTo.pathname}${returnTo.search ?? ''}` : '/hub?tab=survey';
+
+  // Keep the current query so an explicit ?tenant= override survives the hop, and
+  // tell the account page whether this is a reset or a first-time activation.
+  const findAccountLink = (mode?: 'reset') => {
+    const params = new URLSearchParams(location.search);
+    if (mode) params.set('mode', mode);
+    const search = params.toString();
+    return `/find-account${search ? `?${search}` : ''}`;
+  };
 
   const resolveAfterLogin = async (loginEmail: string) => {
     try {
@@ -114,18 +124,30 @@ export default function EmployeeLogin() {
             className="flex flex-1 flex-col min-h-0 w-full max-w-md mx-auto px-4 sm:px-6 lg:flex-none lg:justify-center"
           >
             <div className="mobile-flow-content px-0 py-2 sm:px-0 lg:overflow-visible lg:px-0 lg:py-0">
-              <img
-                src={ghc ? brand.logo : brand.logoMark}
-                alt={brand.logoAlt}
-                className={cn('mb-6 sm:mb-8', ghc ? brand.logoClassName : brand.logoMarkClassName)}
-              />
+              {brand.logoStyle === 'lockup' ? (
+                <div className="mb-6 flex items-center gap-3 sm:mb-8">
+                  <img src={brand.logoMark} alt={brand.logoAlt} className={brand.logoClassName} />
+                  <span className="font-display text-xl font-semibold tracking-[-0.01em]">
+                    {brand.wordmark}
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={brand.logoStyle === 'banner' ? brand.logo : brand.logoMark}
+                  alt={brand.logoAlt}
+                  className={cn(
+                    'mb-6 sm:mb-8',
+                    brand.logoStyle === 'banner' ? brand.logoClassName : brand.logoMarkClassName,
+                  )}
+                />
+              )}
               {brand.parentCredit ? (
                 <p className="mb-4 -mt-3 text-[11px] text-muted-foreground">{brand.parentCredit}</p>
               ) : null}
 
               <div className="mb-6 sm:mb-8">
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-foreground/60">
-                  {ghc ? 'GreenHouse Capital' : 'Employee'}
+                  {brandedLogin ? tenant.branding.fullName : 'Employee'}
                 </span>
                 <h1 className="mt-2.5 font-serif text-[1.65rem] font-semibold leading-[1.0] tracking-[-0.02em] sm:text-[2.35rem] sm:leading-[0.98]">
                   Welcome back.
@@ -185,7 +207,7 @@ export default function EmployeeLogin() {
 
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[11px] text-muted-foreground">Use your employee work email and password.</p>
-                  <Link to="/find-account" className="text-[11px] font-medium text-primary hover:underline">
+                  <Link to={findAccountLink('reset')} className="text-[11px] font-medium text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>
@@ -223,7 +245,7 @@ export default function EmployeeLogin() {
 
               <div className="mt-5 flex flex-col gap-1.5 border-t border-foreground/10 px-1 pt-4 sm:mt-7 sm:flex-row sm:items-center sm:justify-between lg:mt-9">
                 <Link
-                  to="/find-account"
+                  to={findAccountLink()}
                   className="inline-flex min-h-10 items-center font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70 hover:text-foreground"
                 >
                   First time? → Find your account

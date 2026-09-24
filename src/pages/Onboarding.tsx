@@ -97,7 +97,7 @@ const VIGIPAY_SLIDES: SlideDef[] = [
     kicker: 'VigiPay appraisal',
     headlineHTML: 'Monthly, 360, and <em>formal quarterly evals.</em>',
     body:
-      'VigiPay uses the same instruments as GreenHouse Capital for now: manager monthly reviews, anonymous peer 360 inside VigiPay, and scored quarterly evaluations. Reporting lines follow the VigiPay work-manager map.',
+      'Three instruments run every cycle: manager monthly reviews, anonymous peer 360 inside VigiPay, and scored quarterly evaluations. Reporting lines follow the VigiPay work-manager map.',
     image: heroTeam,
     caption: 'Fig. 01 — VigiPay appraisal workspace',
   },
@@ -105,7 +105,7 @@ const VIGIPAY_SLIDES: SlideDef[] = [
     no: '02',
     label: 'Inside the hub',
     kicker: 'Tasks · Results · Directory · Monitor',
-    headlineHTML: 'Your VigiPay line. <em>Not GHC.</em>',
+    headlineHTML: 'Your VigiPay line. <em>Your roster.</em>',
     body:
       'Managers review their mapped reports. Peer 360 stays inside the VigiPay roster. People Ops / GM release results. Forms will be swapped when VigiPay sends its own spec.',
     image: heroFeedbackSession,
@@ -145,7 +145,7 @@ export default function Onboarding() {
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <img src={brand.logoMark} alt={brand.logoAlt} className="h-7 w-auto sm:h-8 object-contain" />
+          <img src={brand.logoMark} alt={brand.logoAlt} className="h-7 w-auto sm:h-8 rounded-md object-contain" />
           <div className="hidden h-5 w-px bg-border sm:block" />
           <span className="font-mono hidden sm:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
             {ghc ? 'GreenHouse Capital · Appraisal' : vigipay ? 'VigiPay · Appraisal' : 'VGG / BOOM — EO Appraisal'}

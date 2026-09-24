@@ -5,13 +5,26 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import {
+  ghcAdminCompletionRoster,
+  ghcAdminCycleStatus,
+  ghcAdminList360Named,
   ghcAdminListEvaluations,
   ghcGetAdminSummary,
   ghcGetPartnerRecommendations,
   ghcReleasePeriod,
   ghcUpsertPartnerRecommendation,
+  type GhcNamed360Row,
 } from './ghcApi';
-import { GHC_PARTNER_ACTIONS } from './ghcConstants';
+import { GHC_PARTNER_ACTIONS, GHC_CULTURE_VALUES } from './ghcConstants';
+
+function formatReleased(iso: string | null | undefined) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
 
 export default function GhcAdminMonitor({
   periodQuarter,
@@ -21,6 +34,16 @@ export default function GhcAdminMonitor({
   periodMonth: string;
 }) {
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
+  const [roster, setRoster] = useState<Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    role: string | null;
+    monthly_self_done: boolean;
+    peer_360_given: number;
+    peer_360_expected: number;
+    peer_360_done: boolean;
+  }>>([]);
   const [evals, setEvals] = useState<Array<{
     id: string;
     status: string;
@@ -29,6 +52,12 @@ export default function GhcAdminMonitor({
     employee_name: string | null;
     manager_name: string | null;
   }>>([]);
+  const [named360, setNamed360] = useState<GhcNamed360Row[]>([]);
+  const [cycle, setCycle] = useState<{
+    peer_360_released_at: string | null;
+    quarterly_evaluation_released_at: string | null;
+  } | null>(null);
+  const [selected360, setSelected360] = useState<GhcNamed360Row | null>(null);
   const [loading, setLoading] = useState(true);
   const [evalId, setEvalId] = useState('');
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
@@ -36,12 +65,18 @@ export default function GhcAdminMonitor({
   const refresh = async () => {
     setLoading(true);
     try {
-      const [s, list] = await Promise.all([
+      const [s, list, people, named, status] = await Promise.all([
         ghcGetAdminSummary(periodQuarter, periodMonth),
         ghcAdminListEvaluations(periodQuarter).catch(() => []),
+        ghcAdminCompletionRoster(periodQuarter, periodMonth).catch(() => []),
+        ghcAdminList360Named(periodQuarter).catch(() => [] as GhcNamed360Row[]),
+        ghcAdminCycleStatus(periodQuarter).catch(() => null),
       ]);
       setSummary(s as Record<string, number>);
       setEvals(list);
+      setRoster(people);
+      setNamed360(named);
+      setCycle(status);
       if (!evalId && list[0]?.id) setEvalId(list[0].id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Admin summary failed');
@@ -83,7 +118,11 @@ export default function GhcAdminMonitor({
   const release = async (kind: 'peer_360' | 'quarterly_evaluation') => {
     try {
       await ghcReleasePeriod(kind, periodQuarter);
-      toast.success(`${kind} released for ${periodQuarter}`);
+      toast.success(
+        kind === 'peer_360'
+          ? `Peer 360 opened for ${periodQuarter} — employees can now see anonymous scores`
+          : `Evaluation period marked released for ${periodQuarter}`,
+      );
       void refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Release failed');
@@ -115,14 +154,16 @@ export default function GhcAdminMonitor({
     );
   }
 
+  const peerReleased = formatReleased(cycle?.peer_360_released_at);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: 'Roster', value: summary?.roster ?? 0 },
-          { label: 'Monthly submitted', value: summary?.monthlySubmitted ?? 0 },
-          { label: '360 submitted', value: summary?.peer360Submitted ?? 0 },
-          { label: 'Evals submitted', value: summary?.evaluationsSubmitted ?? 0 },
+          { label: 'Self check-in done', value: summary?.monthlySelfSubmitted ?? 0 },
+          { label: 'Self check-in open', value: summary?.monthlySelfOpen ?? 0 },
+          { label: '360 submitted', value: `${summary?.peer360Submitted ?? 0}/${summary?.peer360Expected ?? 0}` },
         ].map((s) => (
           <div key={s.label} className="glass-panel p-4">
             <p className="text-xl font-bold">{s.value}</p>
@@ -132,17 +173,150 @@ export default function GhcAdminMonitor({
       </div>
 
       <div className="glass-panel p-5 space-y-3">
-        <h3 className="text-sm font-semibold">Release gates</h3>
-        <p className="text-xs text-muted-foreground">
-          Periods shown: month {periodMonth} · quarter {periodQuarter}. Releasing 360 makes anonymous aggregates visible.
+        <h3 className="text-sm font-semibold">Open feedback for employees</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Until you release peer 360 for <strong>{periodQuarter}</strong>, people only see “waiting for People Ops”.
+          Release does not change anonymity for employees — they get aggregated scores only. Named reviews stay in the
+          section below for People Ops.
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {peerReleased ? (
+            <Badge variant="default" className="text-[10px]">
+              Peer 360 open since {peerReleased}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px]">
+              Peer 360 not open yet
+            </Badge>
+          )}
+          {cycle?.quarterly_evaluation_released_at ? (
+            <Badge variant="secondary" className="text-[10px]">
+              Eval marked released {formatReleased(cycle.quarterly_evaluation_released_at)}
+            </Badge>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => void release('peer_360')}>Release peer 360 ({periodQuarter})</Button>
+          <Button size="sm" onClick={() => void release('peer_360')}>
+            {peerReleased ? `Re-confirm peer 360 open (${periodQuarter})` : `Release peer 360 (${periodQuarter})`}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => void release('quarterly_evaluation')}>
             Mark eval period released
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => void refresh()}>Refresh</Button>
+          <Button size="sm" variant="ghost" onClick={() => void refresh()}>
+            Refresh
+          </Button>
         </div>
+      </div>
+
+      <div className="glass-panel p-5 space-y-3 overflow-x-auto">
+        <h3 className="text-sm font-semibold">Who has completed self check-in &amp; 360</h3>
+        <p className="text-xs text-muted-foreground">
+          Month {periodMonth} · Quarter {periodQuarter}. 360 “done” means they submitted feedback for every other active
+          teammate.
+        </p>
+        {roster.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No roster rows.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+                <th className="pb-2 pr-3">Name</th>
+                <th className="pb-2 pr-3">Self check-in</th>
+                <th className="pb-2">360 given</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster.map((r) => (
+                <tr key={r.id} className="border-b border-border/40 last:border-0">
+                  <td className="py-2 pr-3 font-medium">
+                    {r.name}
+                    <span className="ml-2 text-[10px] text-muted-foreground">{r.email}</span>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <Badge variant={r.monthly_self_done ? 'default' : 'outline'} className="text-[10px]">
+                      {r.monthly_self_done ? 'Done' : 'Not done'}
+                    </Badge>
+                  </td>
+                  <td className="py-2">
+                    <Badge variant={r.peer_360_done ? 'default' : 'outline'} className="text-[10px]">
+                      {r.peer_360_given}/{r.peer_360_expected} {r.peer_360_done ? 'Done' : 'Not done'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="glass-panel p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Named peer 360 (People Ops only)</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          This is where “identity kept for HR” lives — reviewer names + full answers for {periodQuarter}. Employees never
+          see this list.
+        </p>
+        {named360.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No submitted 360s for this quarter yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {named360.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => setSelected360(row)}
+                className={`flex w-full flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs ${
+                  selected360?.id === row.id ? 'border-primary bg-primary/5' : 'border-border/50'
+                }`}
+              >
+                <span className="font-medium">{row.reviewer_name}</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-medium">{row.reviewee_name}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {row.status}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        )}
+        {selected360 && (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3 text-xs">
+            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+              <span>
+                From <strong className="text-foreground">{selected360.reviewer_name}</strong> (
+                {selected360.reviewer_email})
+              </span>
+              <span>
+                About <strong className="text-foreground">{selected360.reviewee_name}</strong>
+              </span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {GHC_CULTURE_VALUES.map((c) => {
+                const scoreKey = `score_${c.key}` as keyof GhcNamed360Row;
+                const exampleKey = `example_${c.key}` as keyof GhcNamed360Row;
+                return (
+                  <div key={c.key} className="rounded border border-border/40 p-2">
+                    <p className="font-medium">{c.label}</p>
+                    <p className="text-muted-foreground">
+                      Score: {String(selected360[scoreKey] ?? '—')} · {String(selected360[exampleKey] || '—')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            {selected360.did_well ? (
+              <p>
+                <span className="font-medium">Did well: </span>
+                {selected360.did_well}
+              </p>
+            ) : null}
+            {selected360.additional_comments ? (
+              <p>
+                <span className="font-medium">Additional: </span>
+                {selected360.additional_comments}
+              </p>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="glass-panel p-5 space-y-3">
@@ -162,8 +336,12 @@ export default function GhcAdminMonitor({
               >
                 <span className="font-medium">{ev.employee_name}</span>
                 <span className="text-muted-foreground">via {ev.manager_name}</span>
-                <Badge variant="outline" className="text-[10px]">{ev.status}</Badge>
-                <Badge variant="secondary" className="text-[10px]">{ev.total_score ?? '—'}/35</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {ev.status}
+                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {ev.total_score ?? '—'}/35
+                </Badge>
               </button>
             ))}
           </div>
@@ -180,14 +358,21 @@ export default function GhcAdminMonitor({
         />
         <div className="space-y-2">
           {GHC_PARTNER_ACTIONS.map((action) => (
-            <div key={action} className="flex flex-col gap-2 rounded-lg border border-border/50 p-3 sm:flex-row sm:items-center">
-              <Badge variant="outline" className="shrink-0 text-[10px]">{action}</Badge>
+            <div
+              key={action}
+              className="flex flex-col gap-2 rounded-lg border border-border/50 p-3 sm:flex-row sm:items-center"
+            >
+              <Badge variant="outline" className="shrink-0 text-[10px]">
+                {action}
+              </Badge>
               <Input
                 placeholder="Partners decision / notes"
                 value={partnerDrafts[action] || ''}
                 onChange={(e) => setPartnerDrafts((prev) => ({ ...prev, [action]: e.target.value }))}
               />
-              <Button size="sm" variant="secondary" onClick={() => void savePartner(action)}>Save</Button>
+              <Button size="sm" variant="secondary" onClick={() => void savePartner(action)}>
+                Save
+              </Button>
             </div>
           ))}
         </div>

@@ -8,10 +8,14 @@ interface FeedbackItem {
   direction: string;
 }
 
+type BucketKey = 'continueDoing' | 'startDoing' | 'stopDoing';
+
 interface QualitativeFeedbackProps {
   startDoing: FeedbackItem[];
   stopDoing: FeedbackItem[];
   continueDoing: FeedbackItem[];
+  /** Override headings when the source prompts don't map 1:1 to start / stop / continue. */
+  labels?: Partial<Record<BucketKey, { label: string; desc: string }>>;
 }
 
 const DIRECTION_META = {
@@ -25,6 +29,13 @@ const SECTIONS = [
   { key: 'startDoing' as const, label: 'Start Doing', emoji: '🚀', desc: 'Recommendations to adopt', color: 'border-l-blue-500' },
   { key: 'stopDoing' as const, label: 'Stop Doing', emoji: '🛑', desc: 'Areas for improvement', color: 'border-l-red-500' },
 ];
+
+/** Headings for the Q3 2026 streamlined 360, whose prompts merge start/stop and lead with "improve". */
+export const BOOM_360_FEEDBACK_LABELS: Partial<Record<BucketKey, { label: string; desc: string }>> = {
+  continueDoing: { label: 'Continue Doing', desc: 'Creates meaningful value for the team' },
+  startDoing: { label: 'Start or Stop', desc: 'Behaviour changes that raise effectiveness' },
+  stopDoing: { label: 'Improve', desc: 'Specific gaps and what better looks like' },
+};
 
 function FeedbackSection({ items, label, emoji, desc, color }: { items: FeedbackItem[]; label: string; emoji: string; desc: string; color: string }) {
   const [expanded, setExpanded] = useState(true);
@@ -94,7 +105,7 @@ function FeedbackSection({ items, label, emoji, desc, color }: { items: Feedback
   );
 }
 
-export default function QualitativeFeedback({ startDoing, stopDoing, continueDoing }: QualitativeFeedbackProps) {
+export default function QualitativeFeedback({ startDoing, stopDoing, continueDoing, labels }: QualitativeFeedbackProps) {
   const data = { startDoing, stopDoing, continueDoing };
   const total = startDoing.length + stopDoing.length + continueDoing.length;
 
@@ -109,7 +120,7 @@ export default function QualitativeFeedback({ startDoing, stopDoing, continueDoi
       </h2>
       <div className="space-y-3">
         {SECTIONS.map(s => (
-          <FeedbackSection key={s.key} items={data[s.key]} {...s} />
+          <FeedbackSection key={s.key} items={data[s.key]} {...s} {...labels?.[s.key]} />
         ))}
       </div>
     </div>

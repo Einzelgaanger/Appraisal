@@ -23,6 +23,7 @@ import { ghcGetDirectory, ghcGetMyTasks, type GhcTaskRow } from './ghcApi';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
 import { useTenant } from '@/tenants/TenantContext';
 import GhcMonthlyReviewRunner from './GhcMonthlyReviewRunner';
+import GhcMonthlySelfCheckinRunner from './GhcMonthlySelfCheckinRunner';
 import Ghc360Runner from './Ghc360Runner';
 import GhcQuarterlyEvaluationRunner from './GhcQuarterlyEvaluationRunner';
 import GhcMyResults from './GhcMyResults';
@@ -47,6 +48,8 @@ interface Props {
 
 export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin = false }: Props) {
   const { tenant } = useTenant();
+  // This hub is shared by every GHC-style tenant, so all copy names the active company.
+  const org = tenant.branding.fullName;
   const [searchParams, setSearchParams] = useSearchParams();
   const periodQuarter = resolveQuarterPeriod(searchParams.get('ghcQuarter'));
   const periodMonth = resolveMonthPeriod(searchParams.get('ghcMonth'));
@@ -58,11 +61,11 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
       setSearchParams((prev) => {
         const params = new URLSearchParams(prev);
         params.set('ghcTab', next);
-        if (!params.get('tenant')) params.set('tenant', 'ghc');
+        if (!params.get('tenant')) params.set('tenant', tenant.slug);
         return params;
       }, { replace: true });
     },
-    [setSearchParams],
+    [setSearchParams, tenant.slug],
   );
 
   useEffect(() => {
@@ -106,14 +109,14 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
       setTasks(rows);
     } catch (e) {
       console.error(e);
-      const raw = e instanceof Error ? e.message : 'Could not load GHC tasks';
+      const raw = e instanceof Error ? e.message : 'Could not load appraisal tasks';
       const missingSchema =
         /ghc_get_my_tasks|Could not find the function|schema cache|does not exist/i.test(raw);
       const message = missingSchema
-        ? 'GHC database migration is not applied yet. Apply 20260909180000_ghc_appraisal_system.sql, then refresh.'
+        ? 'The appraisal database migration is not applied yet. Apply 20260909180000_ghc_appraisal_system.sql, then refresh.'
         : raw;
       setLoadError(message);
-      toast.error(missingSchema ? 'GHC database not ready' : message);
+      toast.error(missingSchema ? 'Appraisal database not ready' : message);
       setTasks([]);
     } finally {
       setLoading(false);
@@ -171,7 +174,7 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
   if (!employeeId) {
     return (
       <div className="glass-panel p-8 text-sm text-muted-foreground">
-        Complete your profile and link to the GreenHouse Capital roster to see appraisal tasks.
+        Complete your profile and link to the {org} roster to see appraisal tasks.
       </div>
     );
   }
@@ -180,10 +183,10 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">GreenHouse Capital</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{org}</p>
             <h2 className="font-display text-2xl font-medium tracking-tight">Your appraisal workspace</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Monthly manager reviews, quarterly 360, and formal evaluations for GreenHouse Capital.
+              Monthly manager reviews, quarterly 360, and formal evaluations for {org}.
               {employeeName ? ` Signed in as ${employeeName}.` : ''}
             </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -232,23 +235,24 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
             </div>
           ) : loadError ? (
             <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive space-y-2">
-              <p className="font-medium">Could not load GHC tasks</p>
+              <p className="font-medium">Could not load {org} tasks</p>
               <p className="text-destructive/90 leading-relaxed">{loadError}</p>
             </div>
           ) : tasks.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground space-y-1">
-              <p>No open GHC tasks for {periodMonth} / {periodQuarter}.</p>
+              <p>No open {org} tasks for {periodMonth} / {periodQuarter}.</p>
               <p className="text-xs">
-                Managers should see monthly + quarterly evaluation rows for their reports; everyone should see peer 360s for the rest of the active roster.
+                Managers should see monthly + quarterly evaluation rows for their reports; everyone should see a monthly self check-in plus peer 360s for the rest of the active roster.
               </p>
             </div>
           ) : (
             <>
-              {(['monthly_manager', 'peer_360', 'quarterly_evaluation', 'acknowledge_evaluation'] as const).map((kind) => {
+              {(['monthly_self', 'monthly_manager', 'peer_360', 'quarterly_evaluation', 'acknowledge_evaluation'] as const).map((kind) => {
                 const list = grouped.get(kind);
                 if (!list?.length) return null;
                 const title =
-                  kind === 'monthly_manager' ? 'Monthly manager reviews'
+                  kind === 'monthly_self' ? 'Monthly self check-in'
+                    : kind === 'monthly_manager' ? 'Monthly manager reviews'
                     : kind === 'peer_360' ? 'Quarterly 360 feedback'
                       : kind === 'quarterly_evaluation' ? 'Quarterly evaluations'
                         : 'Acknowledgements';
@@ -328,6 +332,14 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
         )}
       </Tabs>
 
+      {runner?.kind === 'monthly_self' && (
+        <GhcMonthlySelfCheckinRunner
+          open
+          onOpenChange={(open) => { if (!open) setRunner(null); }}
+          task={runner}
+          onSaved={() => { setRunner(null); void load(); }}
+        />
+      )}
       {runner?.kind === 'monthly_manager' && (
         <GhcMonthlyReviewRunner
           open

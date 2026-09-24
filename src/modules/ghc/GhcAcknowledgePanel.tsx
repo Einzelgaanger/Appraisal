@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ghcAcknowledgeEvaluation, ghcGetQuarterlyEvaluation, type GhcTaskRow } from './ghcApi';
 import { useEffect } from 'react';
+import { useTenant } from '@/tenants/TenantContext';
 import GhcEvaluationDetail from './GhcEvaluationDetail';
 
 export default function GhcAcknowledgePanel({
@@ -16,6 +17,7 @@ export default function GhcAcknowledgePanel({
   onDone: () => void;
   embedded?: boolean;
 }) {
+  const { tenant } = useTenant();
   const [understanding, setUnderstanding] = useState('');
   const [response, setResponse] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +66,7 @@ export default function GhcAcknowledgePanel({
         <Textarea value={understanding} onChange={(e) => setUnderstanding(e.target.value)} rows={4} />
       </div>
       <div className="space-y-2">
-        <Label>Feedback to your manager and GreenHouse Capital</Label>
+        <Label>Feedback to your manager and {tenant.branding.fullName}</Label>
         <Textarea value={response} onChange={(e) => setResponse(e.target.value)} rows={4} />
       </div>
       {summary?.status !== 'acknowledged' && (

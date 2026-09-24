@@ -188,6 +188,7 @@ export type Database = {
           form_id: string
           helper_text: string | null
           id: string
+          is_active: boolean
           min_words: number | null
           question_text: string
           question_type: string
@@ -200,6 +201,7 @@ export type Database = {
           form_id: string
           helper_text?: string | null
           id?: string
+          is_active?: boolean
           min_words?: number | null
           question_text: string
           question_type?: string
@@ -212,6 +214,7 @@ export type Database = {
           form_id?: string
           helper_text?: string | null
           id?: string
+          is_active?: boolean
           min_words?: number | null
           question_text?: string
           question_type?: string

@@ -126,6 +126,63 @@
     --sidebar-border: 180 28% 18%;
     --sidebar-ring: 18 58% 58%;
   }
+
+  /* VigiPay — sampled from their logo: teal ground #003A48, mark green #68BB73, coin gold from the cover art */
+  html[data-tenant='vigipay'] {
+    --background: 192 30% 96%;
+    --foreground: 192 60% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 192 60% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 192 60% 11%;
+
+    /* Brand green is too light for white text, so primary is a deepened version of it */
+    --primary: 128 42% 34%;
+    --primary-glow: 128 38% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 192 24% 91%;
+    --secondary-foreground: 192 60% 11%;
+
+    --muted: 192 22% 93%;
+    --muted-foreground: 192 18% 38%;
+
+    --accent: 42 78% 55%;
+    --accent-foreground: 192 60% 11%;
+
+    --success: 128 42% 34%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 192 20% 82%;
+    --input: 192 20% 82%;
+    --ring: 128 38% 50%;
+
+    --ink: 192 60% 11%;
+    --paper: 192 30% 96%;
+    --paper-deep: 192 24% 90%;
+
+    --chart-1: 128 38% 45%;
+    --chart-2: 192 100% 20%;
+    --chart-3: 42 78% 55%;
+    --chart-4: 192 60% 14%;
+    --chart-5: 0 72% 51%;
+
+    --score-excellent: 128 42% 34%;
+    --score-good: 192 100% 24%;
+    --score-average: 42 78% 55%;
+    --score-poor: 0 72% 51%;
+
+    --sidebar-background: 192 100% 14%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 128 38% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 192 80% 19%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 192 60% 22%;
+    --sidebar-ring: 42 78% 55%;
+  }
 }
 
 @layer base {

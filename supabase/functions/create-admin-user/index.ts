@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { requireGlobalAdmin } from "../_shared/require-admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // This endpoint mints global administrators, so the caller must already be one.
+    const gate = await requireGlobalAdmin(req, corsHeaders);
+    if (!gate.ok) return gate.response;
+    const supabaseAdmin = gate.admin;
+
     const { email, password, name, department } = await req.json();
     const normalizedEmail = email?.trim().toLowerCase();
 
@@ -22,11 +27,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    console.log("Admin creation requested", { by: gate.callerEmail, target: normalizedEmail });
 
     // Create the auth user
     const { data: userData, error: createError } =

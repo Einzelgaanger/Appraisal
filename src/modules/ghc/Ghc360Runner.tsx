@@ -99,7 +99,11 @@ export default function Ghc360Runner({
         ...form,
       });
       setRecordId(id);
-      toast.success(status === 'submitted' ? '360 submitted (identity kept for HR only)' : 'Draft saved');
+      toast.success(
+        status === 'submitted'
+          ? '360 submitted — anonymous to peers; People Ops can see your name in Monitor'
+          : 'Draft saved',
+      );
       if (status === 'submitted') onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save');

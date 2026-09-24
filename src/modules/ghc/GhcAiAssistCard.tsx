@@ -5,6 +5,7 @@ import { Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENABLE_APP_AI } from '@/lib/featureFlags';
 import { ghcAiDraftAssist } from './ghcApi';
+import { useTenant } from '@/tenants/TenantContext';
 
 export default function GhcAiAssistCard({
   employeeName,
@@ -15,8 +16,10 @@ export default function GhcAiAssistCard({
   periodMonth: string;
   periodQuarter: string;
 }) {
+  const { tenant } = useTenant();
+  const org = tenant.branding.fullName;
   const [context, setContext] = useState(
-    `Manager briefing for GreenHouse Capital.\nReviewer: ${employeeName ?? 'Manager'}\nMonth: ${periodMonth}\nQuarter: ${periodQuarter}\n\nPaste monthly notes, 360 themes, or OKR evidence here. Ask for strengths, improvements, and a draft supervisor narrative.`,
+    `Manager briefing for ${org}.\nReviewer: ${employeeName ?? 'Manager'}\nMonth: ${periodMonth}\nQuarter: ${periodQuarter}\n\nPaste monthly notes, 360 themes, or OKR evidence here. Ask for strengths, improvements, and a draft supervisor narrative.`,
   );
   const [output, setOutput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,7 +50,7 @@ export default function GhcAiAssistCard({
           '1. Strengths — list 3 evidenced behaviours from monthly + 360.',
           '2. Improvements — list 2–3 concrete gaps with examples.',
           '3. Goals — attach timeline + reviewer for each improvement.',
-          '4. Culture narrative — one sentence per GHC value with proof.',
+          `4. Culture narrative — one sentence per ${org} value with proof.`,
         ].join('\n'),
       );
     } finally {

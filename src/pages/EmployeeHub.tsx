@@ -21,7 +21,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
-import QualitativeFeedback from '@/components/employee-dashboard/QualitativeFeedback';
+import QualitativeFeedback, { BOOM_360_FEEDBACK_LABELS } from '@/components/employee-dashboard/QualitativeFeedback';
 import AIInsightsCarousel from '@/components/employee-dashboard/AIInsightsCarousel';
 import DetailedCategoryBreakdown from '@/components/employee-dashboard/DetailedCategoryBreakdown';
 import AnonymityBanner from '@/components/employee-dashboard/AnonymityBanner';
@@ -1002,7 +1002,7 @@ export default function EmployeeHub() {
       >
         <div className="px-4 h-14 flex items-center justify-between min-h-[3.5rem]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 object-contain" />
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 rounded-md object-contain" />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
               ◉ {activeTab === 'survey' ? 'Appraisal'
                   : activeTab === 'dashboard' ? 'My Dashboard'
@@ -1254,6 +1254,7 @@ export default function EmployeeHub() {
                               startDoing={qualitativeFeedback.startDoing}
                               stopDoing={qualitativeFeedback.stopDoing}
                               continueDoing={qualitativeFeedback.continueDoing}
+                              labels={BOOM_360_FEEDBACK_LABELS}
                             />
                           </div>
                         )}
@@ -1383,7 +1384,7 @@ export default function EmployeeHub() {
             {ghcMode ? (
               <div className="glass-panel p-6 space-y-4">
                 <div className="flex items-start gap-3">
-                  <img src={brand.logoMark} alt={brand.logoAlt} className="h-10 w-auto object-contain" />
+                  <img src={brand.logoMark} alt={brand.logoAlt} className="h-10 w-auto rounded-md object-contain" />
                   <div>
                     <h3 className="text-sm font-semibold">{tenant.branding.fullName} growth</h3>
                     <p className="mt-1 text-sm text-muted-foreground leading-relaxed">

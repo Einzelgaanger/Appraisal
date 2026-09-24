@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { resolveTenantFromHostname } from '@/tenants/config';
 
 interface Profile {
   id: string;
@@ -17,6 +18,45 @@ interface Profile {
   created_at: string | null;
 }
 
+/** A company this login may act as, from the my_companies() RPC. */
+export interface Company {
+  employee_id: string;
+  tenant_slug: string | null;
+  company_name: string | null;
+  employee_role: string | null;
+  is_active: boolean;
+}
+
+const db = supabase as any;
+
+/**
+ * Where this login may work, and which company it is currently acting as.
+ *
+ * Routing follows the active company rather than employees.locked_tenant_slug,
+ * which also covers everyone who was never given a lock.
+ */
+async function loadCompanyContext(employeeId: string | null | undefined) {
+  const { data: companyRows } = await db.rpc('my_companies');
+  const companies = (companyRows ?? []) as Company[];
+
+  let companyAdmin = false;
+  let staticLock: string | null = null;
+
+  if (employeeId) {
+    const { data } = await supabase
+      .from('employees')
+      .select('locked_tenant_slug, company_admin')
+      .eq('id', employeeId)
+      .maybeSingle();
+    const row = data as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
+    companyAdmin = !!row?.company_admin;
+    staticLock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
+  }
+
+  const active = companies.find((c) => c.is_active) ?? companies[0];
+  return { companies, companyAdmin, lock: active?.tenant_slug ?? staticLock };
+}
+
 interface EmployeeAuthContextType {
   user: User | null;
   session: Session | null;
@@ -25,7 +65,11 @@ interface EmployeeAuthContextType {
   isAdmin: boolean;
   /** Company-scoped admin (VigiPay People Ops / GM) — not global platform admin. */
   isCompanyAdmin: boolean;
-  /** Employee row lock: this person always uses this tenant slug. */
+  /** Every company this login may act as. More than one means the switcher applies. */
+  companies: Company[];
+  /** Move this login to another of its companies, then route to that tenant. */
+  switchCompany: (employeeId: string) => Promise<{ error: string | null }>;
+  /** Tenant slug to route to, taken from the active company. */
   lockedTenantSlug: string | null;
   /** True until initial session read completes — use for route guards */
   isAuthLoading: boolean;
@@ -47,6 +91,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
   const [lockedTenantSlug, setLockedTenantSlug] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -78,6 +123,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false);
         setIsCompanyAdmin(false);
         setLockedTenantSlug(null);
+        setCompanies([]);
         setProfileLoading(false);
         return;
       }
@@ -128,19 +174,12 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setProfile(resolvedProfile);
 
-      let companyAdmin = false;
-      let lock: string | null = null;
-      if (resolvedProfile?.employee_id) {
-        const { data: empLock } = await supabase
-          .from('employees')
-          .select('locked_tenant_slug, company_admin')
-          .eq('id', resolvedProfile.employee_id)
-          .maybeSingle();
-        const row = empLock as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
-        companyAdmin = !!row?.company_admin;
-        lock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
-      }
+      const { companies: myCompanies, companyAdmin, lock } = await loadCompanyContext(
+        resolvedProfile?.employee_id,
+      );
+
       if (cancelled) return;
+      setCompanies(myCompanies);
       setIsCompanyAdmin(companyAdmin);
       setLockedTenantSlug(lock);
       setIsAdmin(!!roleData || companyAdmin);
@@ -163,22 +202,24 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     ]);
     const nextProfile = profileData as Profile | null;
     setProfile(nextProfile);
-    let companyAdmin = false;
-    let lock: string | null = null;
-    if (nextProfile?.employee_id) {
-      const { data: empLock } = await supabase
-        .from('employees')
-        .select('locked_tenant_slug, company_admin')
-        .eq('id', nextProfile.employee_id)
-        .maybeSingle();
-      const row = empLock as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
-      companyAdmin = !!row?.company_admin;
-      lock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
-    }
+
+    const { companies: myCompanies, companyAdmin, lock } = await loadCompanyContext(
+      nextProfile?.employee_id,
+    );
+    setCompanies(myCompanies);
     setIsCompanyAdmin(companyAdmin);
     setLockedTenantSlug(lock);
     setIsAdmin(!!roleData || companyAdmin);
     setProfileLoading(false);
+  };
+
+  const switchCompany = async (employeeId: string) => {
+    const { error } = await db.rpc('set_active_company', { _employee_id: employeeId });
+    if (error) return { error: error.message as string };
+    // Reloading rewrites lockedTenantSlug, which TenantLockEnforcer then follows to
+    // the new company's host.
+    await refreshProfile();
+    return { error: null };
   };
 
   const login = async (email: string, password: string) => {
@@ -204,9 +245,14 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    const siteUrl = window.location.origin;
+    // Come back to the host the request was made from, and carry the tenant slug
+    // so hosts that do not identify a tenant on their own (localhost, preview
+    // URLs) still land on the right branding after Supabase redirects.
+    const tenant = resolveTenantFromHostname(window.location.hostname, window.location.search, {
+      lockedTenantSlug,
+    });
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${siteUrl}/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password?tenant=${tenant.slug}`,
     });
     return { error: error?.message ?? null };
   };
@@ -223,6 +269,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         isAdmin,
         isCompanyAdmin,
+        companies,
+        switchCompany,
         lockedTenantSlug,
         isAuthLoading: !authReady,
         isLoading: !authReady || profileLoading,

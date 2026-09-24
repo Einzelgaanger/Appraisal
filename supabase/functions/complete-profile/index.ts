@@ -90,44 +90,38 @@ Deno.serve(async (req) => {
 
     const { data: existingEmployee } = await admin
       .from("employees")
-      .select("id, locked_tenant_slug, subsidiary_id, vigipay_appraisal_active")
+      .select("id, locked_tenant_slug, subsidiary_id, hierarchy_level")
       .ilike("email", email)
       .maybeSingle();
 
-    let employeeId = existingEmployee?.id as string | undefined;
-    const lockedSlug = typeof existingEmployee?.locked_tenant_slug === "string"
-      ? existingEmployee.locked_tenant_slug.trim().toLowerCase()
-      : "";
-    const lockedSubsidiaryId = lockedSlug === "vigipay"
-      ? "33333333-3333-3333-3333-333333333333"
-      : (existingEmployee?.subsidiary_id as string | undefined);
-    const effectiveSubsidiaryId = lockedSubsidiaryId || subsidiaryId;
-
-    if (employeeId) {
-      const patch: Record<string, unknown> = {
-        name,
-        role,
-        department,
-        email,
-        hierarchy_level: hierarchyLevel,
-      };
-      if (!lockedSlug) {
-        patch.subsidiary_id = effectiveSubsidiaryId;
-      }
-      const { error: employeeError } = await admin
-        .from("employees")
-        .update(patch)
-        .eq("id", employeeId);
-      if (employeeError) throw employeeError;
-    } else {
-      const { data: newEmployee, error: employeeError } = await admin
-        .from("employees")
-        .insert({ name, role, department, subsidiary_id: effectiveSubsidiaryId, hierarchy_level: hierarchyLevel, email })
-        .select("id")
-        .single();
-      if (employeeError) throw employeeError;
-      employeeId = newEmployee.id;
+    // The roster is the only place company membership is decided. Without a row
+    // there is nothing to confirm, and letting this create one would let anyone
+    // with a login place themselves in a company at a seniority of their choosing.
+    if (!existingEmployee?.id) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "This account is not on the employee roster yet. Ask your administrator to add you, then sign in again.",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
+
+    const employeeId = existingEmployee.id as string;
+
+    // Company and seniority are authorization-bearing: they decide which appraisal
+    // pool you land in and who assesses you. They come from the roster, never from
+    // the request body. Only the descriptive fields are the employee's to confirm.
+    const effectiveSubsidiaryId = (existingEmployee.subsidiary_id as string | undefined) ?? subsidiaryId;
+    const effectiveHierarchyLevel = existingEmployee.hierarchy_level === null
+      ? hierarchyLevel
+      : (existingEmployee.hierarchy_level as number);
+
+    const { error: employeeError } = await admin
+      .from("employees")
+      .update({ name, role, department, email })
+      .eq("id", employeeId);
+    if (employeeError) throw employeeError;
 
     const completedAt = new Date().toISOString();
     const { error: profileError } = await admin
@@ -139,7 +133,7 @@ Deno.serve(async (req) => {
         role,
         department,
         subsidiary_id: effectiveSubsidiaryId,
-        hierarchy_level: hierarchyLevel,
+        hierarchy_level: effectiveHierarchyLevel,
         employee_id: employeeId,
         profile_completed: true,
         profile_completed_at: completedAt,

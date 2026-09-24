@@ -20,12 +20,14 @@ import {
   ghcGetMyEvaluations,
   ghcGetQuarterlyEvaluation,
   ghcListAccessibleEvaluations,
+  ghcListReportSelfCheckins,
   ghcListSubmittedMonthlyForMe,
   ghcPostDiscussionMessage,
   type GhcTaskRow,
 } from './ghcApi';
 import GhcAcknowledgePanel from './GhcAcknowledgePanel';
 import GhcEvaluationDetail, { GhcMonthlyReviewDetail } from './GhcEvaluationDetail';
+import GhcFeedbackDiscussion from './GhcFeedbackDiscussion';
 import { resolveMonthPeriod } from '@/lib/boomPeriods';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -70,6 +72,7 @@ export default function GhcMyResults({
     manager_id: string;
   }>>([]);
   const [monthlyRows, setMonthlyRows] = useState<Array<Record<string, unknown>>>([]);
+  const [selfCheckins, setSelfCheckins] = useState<Array<Record<string, unknown>>>([]);
   const [activeEvalId, setActiveEvalId] = useState<string | null>(null);
   const [evalRow, setEvalRow] = useState<Record<string, unknown> | null>(null);
   const [discussion, setDiscussion] = useState<{ messages: Array<{ id: string; authorName: string; body: string; createdAt: string }> } | null>(null);
@@ -83,17 +86,19 @@ export default function GhcMyResults({
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: me } = await (supabase as any).rpc('ghc_me');
-        const [data, myEvals, monthly, accessibleEvals] = await Promise.all([
+        const [data, myEvals, monthly, accessibleEvals, reportSelf] = await Promise.all([
           ghcGetMy360Aggregate(periodQuarter),
           ghcGetMyEvaluations(periodQuarter).catch(() => []),
           ghcListSubmittedMonthlyForMe(periodMonth).catch(() => []),
           ghcListAccessibleEvaluations(periodQuarter).catch(() => []),
+          ghcListReportSelfCheckins(periodMonth).catch(() => []),
         ]);
         if (cancelled) return;
         setMeId(typeof me === 'string' ? me : me ?? null);
         setAgg(data);
         setEvals(myEvals);
         setMonthlyRows(monthly);
+        setSelfCheckins(reportSelf);
         setAccessible(accessibleEvals);
         const preferred =
           acknowledgeTask?.record_id ||
@@ -195,8 +200,9 @@ export default function GhcMyResults({
         </div>
         {!agg?.released ? (
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Results release when HR opens the period. {agg?.peerCount ? `${agg.peerCount} peer review(s) already in.` : 'No submitted reviews yet.'}
-            Reviewer names stay with HR only.
+            Not visible yet — People Ops opens this quarter from Appraisal → Monitor → “Release peer 360”.{' '}
+            {agg?.peerCount ? `${agg.peerCount} peer review(s) already in.` : 'No submitted reviews yet.'}{' '}
+            Your anonymous scores appear after release; reviewer names stay with People Ops only.
           </p>
         ) : !agg.scores?.length ? (
           <p className="text-xs text-muted-foreground">Released, but no scores yet for this quarter.</p>
@@ -224,6 +230,60 @@ export default function GhcMyResults({
               </ul>
             )}
           </div>
+        )}
+        {meId && (
+          <div className="mt-4">
+            <GhcFeedbackDiscussion
+              kind="peer_360"
+              subjectId={meId}
+              period={periodQuarter}
+              title="360 discussion with your manager"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Team monthly self check-ins ({periodMonth})</h3>
+        <p className="text-[11px] text-muted-foreground">
+          Submitted check-ins from people you manage (and Bunmi / HR can see all). Open a row to chat.
+        </p>
+        {selfCheckins.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No submitted self check-ins visible for this month yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {selfCheckins.map((row) => (
+              <div key={String(row.id)} className="rounded-xl border border-border/50 p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">{String(row.employee_name)}</span>
+                  <Badge variant="outline" className="text-[10px]">{String(row.status)}</Badge>
+                </div>
+                <dl className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                  <div>Time off: {row.time_off_this_quarter == null ? '—' : row.time_off_this_quarter ? 'Yes' : 'No'}</div>
+                  <div>Meeting OKRs: {row.meeting_okrs == null ? '—' : row.meeting_okrs ? 'Yes' : 'No'}</div>
+                  <div>Growth: {row.displaying_growth == null ? '—' : row.displaying_growth ? 'Yes' : 'No'}</div>
+                  <div>Strong relationship: {row.strong_relationship == null ? '—' : row.strong_relationship ? 'Yes' : 'No'}</div>
+                </dl>
+                {row.policy_feedback ? (
+                  <p className="text-xs whitespace-pre-wrap">{String(row.policy_feedback)}</p>
+                ) : null}
+                <GhcFeedbackDiscussion
+                  kind="monthly_self"
+                  subjectId={String(row.employee_id)}
+                  period={periodMonth}
+                  title={`Chat with ${String(row.employee_name)}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {meId && (
+          <GhcFeedbackDiscussion
+            kind="monthly_self"
+            subjectId={meId}
+            period={periodMonth}
+            title="Your self check-in discussion with your manager"
+          />
         )}
       </div>
 

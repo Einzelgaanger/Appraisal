@@ -54,7 +54,7 @@ export default function MobileTabBar({ active, onChange }: MobileTabBarProps) {
                   <img
                     src={brand.faviconHref}
                     alt="Growth"
-                    className="w-5 h-5 rounded-sm object-contain"
+                    className="w-5 h-5 rounded-[4px] object-contain"
                   />
                 ) : (
                   <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.25]' : ''}`} />

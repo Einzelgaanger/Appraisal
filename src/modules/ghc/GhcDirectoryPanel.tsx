@@ -14,7 +14,10 @@ type Row = {
   hierarchy_level: number | null;
   manager_id: string | null;
   secondary_manager_id: string | null;
+  monthly_self_done?: boolean;
   monthly_done: boolean;
+  peer_360_given?: number;
+  peer_360_expected?: number;
   peer_360_count: number;
   eval_done: boolean;
 };
@@ -70,8 +73,10 @@ export default function GhcDirectoryPanel({
     <div className="glass-panel p-5 overflow-x-auto space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">GHC directory & completion</h3>
-          <p className="text-xs text-muted-foreground">Month {periodMonth} · Quarter {periodQuarter}</p>
+          <h3 className="text-sm font-semibold">{tenant.branding.fullName} directory &amp; completion</h3>
+          <p className="text-xs text-muted-foreground">
+            Month {periodMonth} · Quarter {periodQuarter} — Self check-in + 360 given (done / expected)
+          </p>
         </div>
         {myReports.length > 0 && (
           <Button
@@ -90,8 +95,8 @@ export default function GhcDirectoryPanel({
             <th className="pb-2 pr-3">Name</th>
             <th className="pb-2 pr-3 hidden sm:table-cell">Role</th>
             <th className="pb-2 pr-3">Level</th>
-            <th className="pb-2 pr-3">Monthly</th>
-            <th className="pb-2 pr-3">360 in</th>
+            <th className="pb-2 pr-3">Self check-in</th>
+            <th className="pb-2 pr-3">360 given</th>
             <th className="pb-2">Eval</th>
           </tr>
         </thead>
@@ -100,6 +105,10 @@ export default function GhcDirectoryPanel({
             const isMine =
               !!viewerEmployeeId &&
               (r.manager_id === viewerEmployeeId || r.secondary_manager_id === viewerEmployeeId);
+            const selfDone = r.monthly_self_done ?? r.monthly_done;
+            const given = r.peer_360_given ?? 0;
+            const expected = r.peer_360_expected ?? 0;
+            const threeSixtyDone = expected > 0 ? given >= expected : given > 0;
             return (
               <tr key={r.id} className={`border-b border-border/40 last:border-0 ${isMine ? 'bg-primary/5' : ''}`}>
                 <td className="py-2 pr-3 font-medium">
@@ -111,11 +120,15 @@ export default function GhcDirectoryPanel({
                   {displayHierarchyLabel(r.hierarchy_level, true, { appraisalMode: tenant.appraisalMode })}
                 </td>
                 <td className="py-2 pr-3">
-                  <Badge variant={r.monthly_done ? 'default' : 'outline'} className="text-[10px]">
-                    {r.monthly_done ? 'Done' : 'Open'}
+                  <Badge variant={selfDone ? 'default' : 'outline'} className="text-[10px]">
+                    {selfDone ? 'Done' : 'Not done'}
                   </Badge>
                 </td>
-                <td className="py-2 pr-3 font-mono text-xs">{r.peer_360_count}</td>
+                <td className="py-2 pr-3">
+                  <Badge variant={threeSixtyDone ? 'default' : 'outline'} className="text-[10px]">
+                    {given}/{expected || '—'} {threeSixtyDone ? 'Done' : 'Open'}
+                  </Badge>
+                </td>
                 <td className="py-2">
                   <Badge variant={r.eval_done ? 'default' : 'outline'} className="text-[10px]">
                     {r.eval_done ? 'Done' : 'Open'}

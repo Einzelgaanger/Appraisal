@@ -19,5 +19,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Password recovery links land back on /reset-password carrying the session in
+    // the URL fragment, so both of these have to stay on. They are the library
+    // defaults today, but recovery breaks silently if a future default flips.
+    detectSessionInUrl: true,
+    flowType: 'implicit',
   },
 });

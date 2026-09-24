@@ -4,7 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-export type GhcTaskKind = 'monthly_manager' | 'peer_360' | 'quarterly_evaluation' | 'acknowledge_evaluation';
+export type GhcTaskKind =
+  | 'monthly_self'
+  | 'monthly_manager'
+  | 'peer_360'
+  | 'quarterly_evaluation'
+  | 'acknowledge_evaluation';
 
 export type GhcTaskRow = {
   kind: GhcTaskKind;
@@ -30,6 +35,76 @@ export async function ghcGetMonthlyReview(id: string) {
   const { data, error } = await db.from('ghc_monthly_reviews').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
   return data;
+}
+
+export async function ghcGetMonthlySelfCheckin(id: string) {
+  const { data, error } = await db.from('ghc_monthly_self_checkins').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function ghcUpsertMonthlySelfCheckin(payload: Record<string, unknown>) {
+  const { data, error } = await db.rpc('ghc_upsert_monthly_self_checkin', { _payload: payload });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function ghcListReportSelfCheckins(month: string) {
+  const { data, error } = await db.rpc('ghc_list_report_self_checkins', { _period_month: month });
+  if (error) throw error;
+  return (data ?? []) as Array<Record<string, unknown>>;
+}
+
+export async function ghcGetFeedbackDiscussion(
+  kind: 'monthly_self' | 'peer_360',
+  subjectId: string,
+  period: string,
+  facilitatorId?: string | null,
+) {
+  const { data, error } = await db.rpc('ghc_get_feedback_discussion', {
+    _kind: kind,
+    _subject_id: subjectId,
+    _period: period,
+    _facilitator_id: facilitatorId ?? null,
+  });
+  if (error) throw error;
+  return data as {
+    discussion_id: string | null;
+    messages: Array<{
+      id: string;
+      author_employee_id: string;
+      author_name: string;
+      body: string;
+      created_at: string;
+    }>;
+  };
+}
+
+export async function ghcPostFeedbackDiscussionMessage(discussionId: string, body: string) {
+  const { data, error } = await db.rpc('ghc_post_feedback_discussion_message', {
+    _discussion_id: discussionId,
+    _body: body,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function ghcAdminCompletionRoster(quarter: string, month: string) {
+  const { data, error } = await db.rpc('ghc_admin_completion_roster', {
+    _period_quarter: quarter,
+    _period_month: month,
+  });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    role: string | null;
+    monthly_self_done: boolean;
+    peer_360_given: number;
+    peer_360_expected: number;
+    peer_360_done: boolean;
+  }>;
 }
 
 export async function ghcUpsertMonthlyReview(payload: Record<string, unknown>) {
@@ -127,6 +202,51 @@ export async function ghcReleasePeriod(kind: 'peer_360' | 'quarterly_evaluation'
   const { data, error } = await db.rpc('ghc_release_period', { _kind: kind, _period: period });
   if (error) throw error;
   return data;
+}
+
+export type GhcNamed360Row = {
+  id: string;
+  period: string;
+  status: string;
+  submitted_at: string | null;
+  reviewer_id: string;
+  reviewer_name: string | null;
+  reviewer_email: string | null;
+  reviewee_id: string;
+  reviewee_name: string | null;
+  reviewee_email: string | null;
+  score_founders_lps: number | null;
+  example_founders_lps: string | null;
+  score_curious: number | null;
+  example_curious: string | null;
+  score_move_fast: number | null;
+  example_move_fast: string | null;
+  score_overachievement: number | null;
+  example_overachievement: string | null;
+  score_job_done: number | null;
+  example_job_done: string | null;
+  did_well: string | null;
+  additional_comments: string | null;
+};
+
+export async function ghcAdminList360Named(quarter: string) {
+  const { data, error } = await db.rpc('ghc_admin_list_360_named', {
+    _period_quarter: quarter,
+  });
+  if (error) throw error;
+  return (data ?? []) as GhcNamed360Row[];
+}
+
+export async function ghcAdminCycleStatus(quarter: string) {
+  const { data, error } = await db.rpc('ghc_admin_cycle_status', {
+    _period_quarter: quarter,
+  });
+  if (error) throw error;
+  return data as {
+    period: string;
+    peer_360_released_at: string | null;
+    quarterly_evaluation_released_at: string | null;
+  };
 }
 
 export async function ghcGetDiscussion(evaluationId: string) {
@@ -232,7 +352,7 @@ export async function ghcAiDraftAssist(context: string) {
     '1. Strengths — list 3 evidenced behaviours from monthly notes + 360 themes.',
     '2. Improvements — list 2–3 concrete gaps with examples (HR requires evidence).',
     '3. Goals — area / goal / indicator / timeline / reviewer for each improvement.',
-    '4. Culture narrative — one sentence per GHC value with proof.',
+    '4. Culture narrative — one sentence per culture value with proof.',
     '5. Weighted score reminder — Culture /25 + Technical /5 + Growth /5 = /35.',
     '',
     '--- Your pasted context ---',

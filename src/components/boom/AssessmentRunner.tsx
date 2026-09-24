@@ -184,6 +184,7 @@ export default function AssessmentRunner({
         .from('assessment_questions')
         .select('*')
         .eq('form_id', formRow.id)
+        .eq('is_active', true)
         .order('section_order', { ascending: true })
         .order('sort_order', { ascending: true });
       if (qe) {

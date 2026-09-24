@@ -10,36 +10,99 @@ import { Lock, CheckCircle2, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from
 import heroTeam from '@/assets/hero-team-mobile.jpg';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { isGhcTenant } from '@/tenants/config';
+import { isGhcStyleAppraisal } from '@/tenants/config';
+
+/** Drop the consumed recovery token from the address bar, keeping tenant routing intact. */
+function stripTokensFromUrl() {
+  const url = new URL(window.location.href);
+  for (const key of ['token_hash', 'token', 'code', 'type']) url.searchParams.delete(key);
+  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+}
 
 export default function ResetPassword() {
   const { tenant } = useTenant();
   const brand = getTenantBrandAssets(tenant);
-  const ghc = isGhcTenant(tenant);
+  const ghc = isGhcStyleAppraisal(tenant);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [linkState, setLinkState] = useState<'verifying' | 'ready' | 'invalid'>('verifying');
+  const [linkError, setLinkError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for PASSWORD_RECOVERY event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setReady(true);
+    let cancelled = false;
+
+    const settle = (state: 'ready' | 'invalid', message = '') => {
+      if (cancelled) return;
+      setLinkState(state);
+      setLinkError(message);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) settle('ready');
+    });
+
+    void (async () => {
+      const url = new URL(window.location.href);
+      const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+
+      // An expired or already-used link arrives as a description in the fragment
+      // rather than as a thrown error.
+      const described = hash.get('error_description') ?? url.searchParams.get('error_description');
+      if (described) {
+        settle('invalid', described);
+        return;
       }
-    });
 
-    // Check if we already have a session (from the recovery link)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true);
-    });
+      // Depending on how the email template and auth flow are configured, the
+      // token reaches us as a verifiable hash, a PKCE code, or (handled by
+      // detectSessionInUrl) an access token in the fragment. Accept all three so
+      // the flow does not depend on one Supabase project setting.
+      const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
+      const code = url.searchParams.get('code');
 
-    return () => subscription.unsubscribe();
+      if (tokenHash) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'recovery',
+        });
+        stripTokensFromUrl();
+        settle(verifyError ? 'invalid' : 'ready', verifyError?.message ?? '');
+        return;
+      }
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        stripTokensFromUrl();
+        settle(exchangeError ? 'invalid' : 'ready', exchangeError?.message ?? '');
+        return;
+      }
+
+      // detectSessionInUrl consumes the fragment asynchronously, so poll briefly
+      // instead of declaring the link dead on the first miss.
+      const deadline = Date.now() + 4000;
+      while (!cancelled) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          settle('ready');
+          return;
+        }
+        if (Date.now() > deadline) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      settle('invalid');
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,7 +158,7 @@ export default function ResetPassword() {
     );
   }
 
-  if (!ready) {
+  if (linkState === 'verifying') {
     return (
       <div className="mobile-flow-shell app-page flex items-center justify-center px-6">
         <motion.div
@@ -113,12 +176,44 @@ export default function ResetPassword() {
     );
   }
 
+  if (linkState === 'invalid') {
+    return (
+      <div className="mobile-flow-shell app-page flex items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mobile-flow-card max-w-sm w-full text-center"
+        >
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+            <AlertCircle className="h-7 w-7 text-destructive" />
+          </div>
+          <h1 className="mb-1.5 text-xl font-semibold">This link is no longer valid</h1>
+          <p className="mb-5 text-[13px] text-muted-foreground">
+            Password links expire after a short while and can only be used once. Request a fresh one
+            and it will work straight away.
+          </p>
+          {linkError && (
+            <p className="mb-5 rounded-md bg-muted/50 p-2.5 text-[11px] text-muted-foreground">
+              {linkError}
+            </p>
+          )}
+          <Button asChild className="h-11 w-full rounded-md text-sm">
+            <Link to="/find-account">Send me a new link</Link>
+          </Button>
+          <Button asChild variant="ghost" className="mt-2 h-10 w-full text-sm">
+            <Link to="/login">Back to sign in</Link>
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-page flex min-h-dvh-screen flex-col">
       <div className="mobile-hero shrink-0">
         <img src={heroTeam} alt="Team collaboration at VGG" />
         <div className="mobile-hero-caption">
-          <span>{ghc ? '◉ GreenHouse Capital / Activate' : '◉ VGG / Activate'}</span>
+          <span>{ghc ? `◉ ${tenant.branding.fullName} / Activate` : '◉ VGG / Activate'}</span>
           <span>Auth / Set password</span>
         </div>
       </div>
@@ -138,14 +233,14 @@ export default function ResetPassword() {
           className="w-full max-w-md mobile-flow-card"
         >
           <div className="mb-6">
-            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 object-contain" />
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-8 w-auto mb-5 rounded-md object-contain" />
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center mb-3">
               <Lock className="w-5 h-5 text-primary-foreground" />
             </div>
             <h1 className="text-xl font-semibold">Set your new password</h1>
             <p className="text-muted-foreground mt-1 text-[13px]">
               Choose a secure password — you&apos;ll use this every time you sign in to{' '}
-              {ghc ? 'GreenHouse Capital appraisal' : 'VGG Appraisals'}.
+              {ghc ? `${tenant.branding.fullName} appraisal` : 'VGG Appraisals'}.
             </p>
           </div>
 

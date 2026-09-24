@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DEFAULT_TENANT, resolveTenantFromHostname } from './config';
+import { getTenantBrandAssets } from './brandingAssets';
 import type { TenantConfig } from './types';
 
 interface TenantContextValue {
@@ -44,10 +45,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.tenant = tenant.slug;
     document.title = `${tenant.branding.fullName} Appraisal`;
 
-    const faviconHref =
-      tenant.slug === 'ghc' ? '/ghc-favicon.png' : '/favicon.png';
-    const themeColor =
-      tenant.slug === 'ghc' ? '#003333' : tenant.slug === 'vigipay' ? '#0f2744' : '#1a2e22';
+    const { faviconHref, themeColor } = getTenantBrandAssets(tenant);
 
     const ensureLink = (rel: string, href: string) => {
       let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
@@ -70,7 +68,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       document.head.appendChild(themeMeta);
     }
     themeMeta.content = themeColor;
-  }, [tenant.slug, tenant.branding.fullName]);
+  }, [tenant]);
 
   const value = useMemo(
     () => ({ tenant, setSubsidiaryHint, setLockedTenantSlug }),

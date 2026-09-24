@@ -18,6 +18,7 @@ import {
   ghcUpsertQuarterlyEvaluation,
   type GhcTaskRow,
 } from './ghcApi';
+import { useTenant } from '@/tenants/TenantContext';
 
 type Goal = { area: string; goal: string; indicator: string; timeline: string; reviewer: string };
 
@@ -54,6 +55,7 @@ export default function GhcQuarterlyEvaluationRunner({
   managerEmployeeId: string;
   onSaved: () => void;
 }) {
+  const { tenant } = useTenant();
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -171,7 +173,7 @@ export default function GhcQuarterlyEvaluationRunner({
           <DialogTitle>Quarterly evaluation — {task.subject_name}</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          Formal GreenHouse Capital performance evaluation for {task.period}. Ratings 0–5 with supervisor comments.
+          Formal {tenant.branding.fullName} performance evaluation for {task.period}. Ratings 0–5 with supervisor comments.
         </p>
 
         <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs">

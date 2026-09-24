@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 import { GHC_CULTURE_VALUES } from './ghcConstants';
 import { ghcGetMonthlyReview, ghcUpsertMonthlyReview, type GhcTaskRow } from './ghcApi';
+import { useTenant } from '@/tenants/TenantContext';
 
 function YesNo({
   value,
@@ -78,6 +79,7 @@ export default function GhcMonthlyReviewRunner({
   managerEmployeeId: string;
   onSaved: () => void;
 }) {
+  const { tenant } = useTenant();
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
@@ -175,7 +177,7 @@ export default function GhcMonthlyReviewRunner({
           <Field label="Personal issues affecting productivity?">
             <YesNo id="issues" value={form.personal_issues} onChange={(v) => setForm((f) => ({ ...f, personal_issues: v }))} />
           </Field>
-          <Field label="Anything GreenHouse Capital can help with?">
+          <Field label={`Anything ${tenant.branding.fullName} can help with?`}>
             <YesNo id="help" value={form.company_can_help} onChange={(v) => setForm((f) => ({ ...f, company_can_help: v }))} />
           </Field>
           <Field label="Motivated / enthused / challenged?">
