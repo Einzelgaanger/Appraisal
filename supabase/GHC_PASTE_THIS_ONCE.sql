@@ -71,7 +71,7 @@ BEGIN
       _title,
       '<p style="margin:0 0 12px;line-height:1.55;color:#334155">' || replace(replace(_body, '<', '&lt;'), '>', '&gt;') || '</p>',
       'Open workspace',
-      'https://ghc.vgg.app' || href,
+      'https://ghc.vgg.tools' || href,
       'You received this because you are on the GreenHouse Capital appraisal roster.'
     );
     PERFORM public.boom_queue_transactional_email(
@@ -637,15 +637,14 @@ BEGIN
   RETURN rid;
 END;
 $$;
--- Point Executive Team primary hostname at executive.vgg.app (keep appraisal as alias).
+-- Point Executive Team primary hostname at executive.vgg.tools.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tenant_domains') THEN
     INSERT INTO public.tenant_domains (tenant_id, hostname, is_primary) VALUES
-      ('11111111-1111-1111-1111-111111111110', 'executive.vgg.app', true),
-      ('11111111-1111-1111-1111-111111111110', 'appraisal.vgg.app', false),
-      ('11111111-1111-1111-1111-111111111110', 'executiveteam.vgg.app', false),
-      ('22222222-2222-2222-2222-222222222220', 'ghc.vgg.app', true)
+      ('11111111-1111-1111-1111-111111111110', 'executive.vgg.tools', true),
+      ('22222222-2222-2222-2222-222222222220', 'ghc.vgg.tools', true),
+      ('33333333-3333-3333-3333-333333333330', 'vigipay.vgg.tools', true)
     ON CONFLICT (hostname) DO UPDATE
     SET tenant_id = EXCLUDED.tenant_id,
         is_primary = EXCLUDED.is_primary;
@@ -653,11 +652,11 @@ BEGIN
     UPDATE public.tenant_domains
     SET is_primary = false
     WHERE tenant_id = '11111111-1111-1111-1111-111111111110'
-      AND hostname <> 'executive.vgg.app';
+      AND hostname <> 'executive.vgg.tools';
 
     UPDATE public.tenant_domains
     SET is_primary = true
-    WHERE hostname = 'executive.vgg.app';
+    WHERE hostname IN ('executive.vgg.tools', 'ghc.vgg.tools', 'vigipay.vgg.tools');
   END IF;
 END $$;
 -- ---------------------------------------------------------------------------

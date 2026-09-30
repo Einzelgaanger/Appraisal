@@ -21,17 +21,18 @@ if (!token) {
   process.exit(1);
 }
 
-// Site URL takes a single value and no wildcards. It is only the fallback for a
-// redirect that fails to match, so it points at the apex marketing host.
+// Site URL: neutral fallback when redirect_to does not match the allow-list (product apex, not a tenant host).
 const SITE_URL = 'https://vgg.tools';
 
-// `*` stops at dots, so one subdomain pattern covers every current and future
-// tenant host in PRODUCTION_TENANT_HOSTS (src/tenants/config.ts). localhost is
-// allowed implicitly by Supabase and deliberately left out.
+// Explicit tenant hosts + wildcards + Render default host + local dev (src/tenants/config.ts).
 const ALLOW_LIST = [
+  'https://executive.vgg.tools/**',
+  'https://ghc.vgg.tools/**',
+  'https://vigipay.vgg.tools/**',
   'https://vgg.tools/**',
   'https://*.vgg.tools/**',
   'https://three60appraisal.onrender.com/**',
+  'http://localhost:8080/**',
 ].join(',');
 
 const api = async (method, body) => {

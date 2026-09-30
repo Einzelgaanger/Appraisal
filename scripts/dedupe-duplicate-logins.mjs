@@ -1,13 +1,17 @@
 /**
- * 18 Executive Office people have two logins pointing at the same roster row:
- * an old @peopleos.co account and a newer corporate one. Keep the corporate one.
+ * Executive Office people who ended up with two logins pointing at the same roster
+ * row: an old @peopleos.co account and a newer corporate one. The corporate address
+ * is the canonical one, so that is the keeper.
  *
  * Deleting a login cascades to its profile, so this refuses to touch any account
- * whose profile is still referenced by appraisal data, and it never deletes a
- * @peopleos.co account that has actually been signed into — those are reported for
- * a human decision instead.
+ * whose profile still carries data. By default it also holds back any @peopleos.co
+ * account that has actually been signed into, since losing it could strand someone.
  *
- * Reports by default. Pass --apply to delete the accounts it marks as safe.
+ *   node scripts/dedupe-duplicate-logins.mjs                    report only
+ *   node scripts/dedupe-duplicate-logins.mjs --apply            delete the never-used ones
+ *   node scripts/dedupe-duplicate-logins.mjs --apply --include-signed-in
+ *       also delete legacy accounts that were used. Only safe once the corporate
+ *       keeper is confirmed sign-in-able — see scripts/check-keeper-logins.mjs.
  */
 import pg from 'pg';
 import { createClient } from '@supabase/supabase-js';
@@ -16,6 +20,7 @@ import { loadDotEnv } from './load-env.mjs';
 loadDotEnv();
 
 const apply = process.argv.includes('--apply');
+const includeSignedIn = process.argv.includes('--include-signed-in');
 
 const c = new pg.Client({
   connectionString: `postgresql://postgres.qnorggoycwbbxdlvbcvq:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD.trim())}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`,
@@ -100,8 +105,15 @@ for (const { person, logins } of pairs.rows) {
     data_on_legacy: data.length ? data.join(',') : 'none',
   };
 
-  if (used || data.length) needsDecision.push({ ...row, why: used ? 'legacy account has been signed into' : 'legacy account carries data' });
-  else safe.push(row);
+  // Data loss is never overridable. A used-but-empty legacy account is, once the
+  // keeper has been confirmed usable.
+  if (data.length) {
+    needsDecision.push({ ...row, why: 'legacy account carries data' });
+  } else if (used && !includeSignedIn) {
+    needsDecision.push({ ...row, why: 'legacy account has been signed into' });
+  } else {
+    safe.push({ ...row, note: used ? 'was used — keeper verified' : 'never used' });
+  }
 }
 
 console.log(`\n== Safe to delete (${safe.length}) — never signed in, no data attached`);

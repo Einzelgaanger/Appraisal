@@ -45,11 +45,13 @@ Env vars stay the same (one Supabase project). Tenant is chosen from the **subdo
 
 **Company Appraisals** project → **Authentication → URL configuration**
 
-**Site URL** (pick one primary, usually EO):
+**Site URL** (product apex — fallback only when a redirect is not allow-listed; tenant apps live on subdomains):
 
 ```text
-https://executive.vgg.tools
+https://vgg.tools
 ```
+
+Automated patch (same values as above): `node scripts/configure-auth-redirects.mjs --apply` with `SUPABASE_ACCESS_TOKEN` in `.env`.
 
 **Redirect URLs** (add all — include wildcards if your plan allows):
 
@@ -57,11 +59,17 @@ https://executive.vgg.tools
 https://executive.vgg.tools/**
 https://ghc.vgg.tools/**
 https://vigipay.vgg.tools/**
-https://vggtools.onrender.com/**
+https://vgg.tools/**
+https://*.vgg.tools/**
+https://three60appraisal.onrender.com/**
 http://localhost:8080/**
 ```
 
-Also keep any legacy `*.vgg.app` URLs until those hosts are retired.
+Or from the repo (needs `SUPABASE_ACCESS_TOKEN` in `.env`):
+
+```bash
+npm run setup:production-hosts -- --apply
+```
 
 ---
 

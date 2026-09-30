@@ -13,6 +13,7 @@
  *   node scripts/supabase-deploy.mjs              # migrations + secrets + functions
  *   node scripts/supabase-deploy.mjs --db-only
  *   node scripts/supabase-deploy.mjs --functions-only
+ *   node scripts/supabase-deploy.mjs --functions-only --fn=auth-email-hook
  *   node scripts/supabase-deploy.mjs --secrets-only
  */
 import { spawnSync } from 'child_process';
@@ -41,6 +42,22 @@ function projectRef() {
   const fromUrl = url.match(/https:\/\/([^.]+)\.supabase\.co/);
   if (fromUrl) return fromUrl[1];
   throw new Error('Could not resolve Supabase project ref (config.toml or VITE_SUPABASE_URL)');
+}
+
+function supabaseBin() {
+  const ext = process.platform === 'win32' ? '.cmd' : '';
+  const local = join(root, 'node_modules', '.bin', `supabase${ext}`);
+  if (existsSync(local)) return local;
+  return null;
+}
+
+function runSupabase(subArgs, opts = {}) {
+  const local = supabaseBin();
+  if (local) {
+    run(local, subArgs, opts);
+    return;
+  }
+  run('npx', ['--yes', 'supabase@latest', ...subArgs], opts);
 }
 
 function run(cmd, cmdArgs, opts = {}) {
@@ -96,15 +113,15 @@ if (runDb) {
       console.error('Missing SUPABASE_DB_PASSWORD for supabase link / db push');
       process.exit(1);
     }
-    run('npx', ['supabase', 'link', '--project-ref', ref, '-p', dbPassword], {
+    runSupabase(['link', '--project-ref', ref, '-p', dbPassword], {
       env: { SUPABASE_ACCESS_TOKEN: accessToken },
     });
-    run('npx', ['supabase', 'db', 'push'], { env: { SUPABASE_ACCESS_TOKEN: accessToken } });
+    runSupabase(['db', 'push'], { env: { SUPABASE_ACCESS_TOKEN: accessToken } });
   } else {
     run('node', ['scripts/apply-migrations.mjs']);
   }
 } else if (accessToken && dbPassword) {
-  run('npx', ['supabase', 'link', '--project-ref', ref, '-p', dbPassword], {
+  runSupabase(['link', '--project-ref', ref, '-p', dbPassword], {
     env: { SUPABASE_ACCESS_TOKEN: accessToken },
   });
 }
@@ -130,7 +147,7 @@ if (runSecrets) {
   add('RECOMMENDATION_EVALUATE_TOKEN');
 
   if (secretPairs.length) {
-    run('npx', ['supabase', 'secrets', 'set', ...secretPairs], {
+    runSupabase(['secrets', 'set', ...secretPairs], {
       env: { SUPABASE_ACCESS_TOKEN: accessToken },
     });
   } else {
@@ -139,7 +156,9 @@ if (runSecrets) {
 }
 
 if (runFunctions) {
-  run('npx', ['supabase', 'functions', 'deploy'], {
+  const fnFilter = args.find((a) => a.startsWith('--fn='))?.slice(5)?.trim();
+  const deployArgs = fnFilter ? ['functions', 'deploy', fnFilter] : ['functions', 'deploy'];
+  runSupabase(deployArgs, {
     env: { SUPABASE_ACCESS_TOKEN: accessToken },
   });
 }

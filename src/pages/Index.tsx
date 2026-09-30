@@ -89,7 +89,7 @@ const Index = () => {
           © Venture Garden Group
         </span>
         <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:text-[10.5px] sm:tracking-[0.22em]">
-          appraisal.vgg.app
+          vgg.tools
         </span>
       </footer>
     </div>

@@ -49,7 +49,7 @@ sheet('00_README', [
     'Each company gets its own workspace branding, forms, assignment rules, and scoring — shared login platform, gated by company.',
   ],
   [
-    'Live URL pattern expected: vigipay.vgg.app (or similar) — confirm in Company_Identity sheet.',
+    'Live URL pattern expected: vigipay.vgg.tools — confirm in Company_Identity sheet.',
   ],
   [''],
   ['Sheet index'],
@@ -104,7 +104,7 @@ sheet('01_Company_Identity', [
     '',
     'List all; include VGG emails if some staff use them',
   ],
-  ['Preferred live hostname', '', 'e.g. vigipay.vgg.app'],
+  ['Preferred live hostname', '', 'e.g. vigipay.vgg.tools'],
   ['Alternate hostnames', '', ''],
   ['Subsidiary / company ID in VGG org chart', '', 'If already listed in group directories'],
   [
@@ -903,7 +903,7 @@ VigiPay should mark \`24_Unique_vs_GHC\` clearly. For awareness only:
 - **Partner board**: promote / salary / bonus / PIP-style actions after eval
 - **Dual managers**: possible (primary + secondary both write in some cases)
 - **Vacant seats**: inactive, no tasks
-- Tenant URL pattern: \`*.vgg.app\` + \`?tenant=\` for local
+- Tenant URL pattern: \`*.vgg.tools\` + \`?tenant=\` for local
 
 If VigiPay says “same as GHC” on a row, we reuse that rule. If different, they must spell the rule in full on that sheet.
 

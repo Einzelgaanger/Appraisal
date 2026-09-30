@@ -18,7 +18,7 @@ const SECTIONS: Section[] = [
         <p>
           The BOOM Appraisal Platform is a private, invite-only performance and 360 feedback system for the
           Executive Office of the GCEO at Venture Garden Group (VGG). It is the production application behind{" "}
-          <code>appraisal.vgg.app</code>: each user is routed to the reviews they must complete based on their place
+          <code>executive.vgg.tools</code>: each user is routed to the reviews they must complete based on their place
           in the EO org chart, and recipients of peer 360 feedback see only anonymous aggregates.
         </p>
         <h3>Core capabilities</h3>
@@ -48,12 +48,12 @@ const SECTIONS: Section[] = [
       <>
         <h3>High-level topology</h3>
         <p>
-          Browser (React 18 SPA over HTTPS) → static host at <code>appraisal.vgg.app</code> → Supabase
+          Browser (React 18 SPA over HTTPS) → static host at <code>executive.vgg.tools</code> → Supabase
           (Postgres, Auth, Storage, Edge Functions). The backend uses an RLS-locked <code>public</code> schema,
           invite-only email/password auth, a public <code>email-assets</code> storage bucket, and Deno edge
           functions for provisioning, email dispatch (<code>pgmq</code> + <code>pg_cron</code>), and optional AI
           helpers. Outbound integrations: Anthropic Claude and Perplexity (when AI features are enabled), and an
-          SMTP relay on <code>notify.appraisal.vgg.app</code>.
+          SMTP relay on <code>notify.vgg.tools</code>.
         </p>
         <h3>Frontend stack</h3>
         <table>
@@ -316,8 +316,8 @@ npm run supabase:deploy    # migrations + functions + secrets sync`}</code></pre
       <>
         <h3>Sender identity</h3>
         <ul>
-          <li>Sending domain: <code>notify.appraisal.vgg.app</code></li>
-          <li>From: <code>VGG People Office &lt;no-reply@notify.appraisal.vgg.app&gt;</code></li>
+          <li>Sending domain: <code>notify.vgg.tools</code></li>
+          <li>From: <code>VGG People Office &lt;no-reply@notify.vgg.tools&gt;</code></li>
           <li>Templates: React (JSX) rendered server-side in <code>_shared/email-templates/*</code></li>
           <li>Categories: signup, invite, magic-link, recovery, email-change, reauthentication.</li>
         </ul>
@@ -424,8 +424,8 @@ npm run supabase:deploy    # migrations + functions + secrets sync`}</code></pre
         </table>
         <h3>Custom domain</h3>
         <ul>
-          <li>App: <code>appraisal.vgg.app</code> (CNAME to the static host).</li>
-          <li>Email: <code>notify.appraisal.vgg.app</code> (SPF, DKIM, DMARC configured).</li>
+          <li>App: <code>executive.vgg.tools</code> (CNAME to the static host).</li>
+          <li>Email: <code>notify.vgg.tools</code> (SPF, DKIM, DMARC configured).</li>
         </ul>
       </>
     ),
@@ -549,7 +549,7 @@ export default function Docs() {
     () => [
       { label: "Audience", value: "Engineers, admins, auditors" },
       { label: "Stack", value: "React · TypeScript · Supabase (Postgres + Auth + Edge)" },
-      { label: "Deploy", value: "appraisal.vgg.app" },
+      { label: "Deploy", value: "executive.vgg.tools" },
       { label: "Owner", value: "Executive Office of the GCEO" },
       { label: "Date", value: "July 2026 · v1.1" },
     ],

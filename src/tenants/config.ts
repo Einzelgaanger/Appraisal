@@ -34,7 +34,7 @@ const boomCapabilities = {
 export const TENANTS: TenantConfig[] = [
   {
     slug: 'executiveteam',
-    // Production: executive.vgg.tools (legacy: *.vgg.app / appraisal)
+    // Production: executive.vgg.tools
     subdomains: ['executive', 'executiveteam', 'appraisal'],
     subsidiaryId: EXECUTIVE_TEAM_SUBSIDIARY_ID,
     modules: ['appraisal'],
@@ -118,7 +118,7 @@ function normalizeHostname(hostname: string): string {
 function extractSubdomain(hostname: string): string {
   const normalized = normalizeHostname(hostname);
   const parts = normalized.split('.');
-  // executive.vgg.tools → executive ; ghc.vgg.app → ghc
+  // executive.vgg.tools → executive ; ghc.vgg.tools → ghc
   return parts[0] ?? normalized;
 }
 

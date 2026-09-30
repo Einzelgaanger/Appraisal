@@ -24,7 +24,7 @@ Use this as a click-path + what to say. No timings. Stay on GHC the whole time.
 Sign in as **Uloma**.
 
 **SAY:**  
-This is GreenHouse Capital’s appraisal. Same platform and auth as Executive Team, different product once you’re in GHC — different forms, scoring, and cadence. Live host is meant to be `ghc.vgg.app`. Locally `tenant=ghc` (or a `@greenhouse.capital` login) forces that mode so we are not looking at BOOM.
+This is GreenHouse Capital’s appraisal. Same platform and auth as Executive Team, different product once you’re in GHC — different forms, scoring, and cadence. Live host is `ghc.vgg.tools`. Locally `tenant=ghc` (or a `@greenhouse.capital` login) forces that mode so we are not looking at BOOM.
 
 ---
 
@@ -142,7 +142,7 @@ If Monitor is missing, skip — don’t stop the flow.
 ## PAGE: Close (any GHC hub screen)
 
 **SAY:**  
-Recap: one codebase, two subsidiaries. EO keeps BOOM. GHC gets monthly manager reviews, quarterly hybrid 360, formal eval weighted culture/technical/growth out of 35 with acknowledge + discussion, partner actions for HR, directory completion, notifications (bell + email), and optional AI draft assist. Org chart — including Mariam’s dual line — drives who sees what. Local `tenant=ghc` is the same product as `ghc.vgg.app`. Happy to take process questions.
+Recap: one codebase, two subsidiaries. EO keeps BOOM. GHC gets monthly manager reviews, quarterly hybrid 360, formal eval weighted culture/technical/growth out of 35 with acknowledge + discussion, partner actions for HR, directory completion, notifications (bell + email), and optional AI draft assist. Org chart — including Mariam’s dual line — drives who sees what. Local `tenant=ghc` is the same product as `ghc.vgg.tools`. Happy to take process questions.
 
 ---
 
@@ -150,7 +150,7 @@ Recap: one codebase, two subsidiaries. EO keeps BOOM. GHC gets monthly manager r
 
 | Feature | Where |
 |--------|--------|
-| Tenant / host split | `?tenant=ghc` locally; `ghc.vgg.app` in prod; EO stays executive/appraisal |
+| Tenant / host split | `?tenant=ghc` locally; `ghc.vgg.tools` in prod; EO stays `executive.vgg.tools` |
 | Hierarchy + dual reports | Tasks + Directory; Mariam → Busayo + Omotola |
 | Monthly 1:1 | Tasks → monthly dialog |
 | Quarterly eval + /35 bands | Tasks → eval dialog |

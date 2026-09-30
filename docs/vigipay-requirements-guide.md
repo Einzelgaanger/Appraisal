@@ -36,7 +36,7 @@ VigiPay should mark `24_Unique_vs_GHC` clearly. For awareness only:
 - **Partner board**: promote / salary / bonus / PIP-style actions after eval
 - **Dual managers**: possible (primary + secondary both write in some cases)
 - **Vacant seats**: inactive, no tasks
-- Tenant URL pattern: `*.vgg.app` + `?tenant=` for local
+- Tenant URL pattern: `*.vgg.tools` + `?tenant=` for local
 
 If VigiPay says “same as GHC” on a row, we reuse that rule. If different, they must spell the rule in full on that sheet.
 

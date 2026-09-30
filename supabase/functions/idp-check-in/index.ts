@@ -46,7 +46,7 @@ serve(async (req) => {
         <p>About ${weeksSince} weeks ago you set a development goal in <strong>${escapeHtml(plan.focus_area)}</strong>:</p>
         <blockquote style="border-left:3px solid #0070f3;padding:8px 16px;background:#f5f5f7;margin:16px 0;border-radius:4px">${escapeHtml(plan.goal)}</blockquote>
         <p>How is it going? Take 2 minutes to log progress, refresh your resources, or mark it complete.</p>
-        <p style="margin:24px 0"><a href="https://appraisal.vgg.app/hub?tab=growth" style="background:#0070f3;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600">Update my plan</a></p>
+        <p style="margin:24px 0"><a href="https://executive.vgg.tools/hub?tab=growth" style="background:#0070f3;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600">Update my plan</a></p>
         <p style="color:#666;font-size:13px">If life moved on and this no longer matters, that's OK — you can archive it in one click.</p>
       </body></html>`;
 

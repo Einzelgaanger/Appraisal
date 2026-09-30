@@ -164,4 +164,4 @@ console.log('Auth refreshed:', report.authUpdated.length);
 console.log('Leftover @peopleos.co (active EO):', leftover?.length ? leftover : '(none — good)');
 console.log('Issues:', report.issues.length ? report.issues : '(none)');
 console.log(`\nShared pilot password: ${DEMO_PW}`);
-console.log('Tell users: login at https://appraisal.vgg.app/login with their corporate email.');
+console.log('Tell users: login at https://executive.vgg.tools/login with their corporate email.');

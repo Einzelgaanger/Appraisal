@@ -88,8 +88,8 @@ async function main() {
         run_id: 'diag-pipeline-test',
         message_id: diagId,
         to: 'diag-pipeline@venturegardengroup.com',
-        from: 'VGG 360° Appraisal <noreply@appraisal.vgg.app>',
-        sender_domain: 'notify.appraisal.vgg.app',
+        from: 'VGG 360° Appraisal <noreply@vgg.tools>',
+        sender_domain: 'notify.vgg.tools',
         subject: 'Pipeline diag (do not deliver)',
         html: '<p>diag</p>',
         text: 'diag',
@@ -143,7 +143,7 @@ async function main() {
     const pub = createClient(url, anonKey);
     const testEmail = process.argv[2] || 'bunmi.akinyemiju@peopleos.co';
     const { error } = await pub.auth.resetPasswordForEmail(testEmail, {
-      redirectTo: 'https://appraisal.vgg.app/reset-password',
+      redirectTo: 'https://executive.vgg.tools/reset-password',
     });
     console.log(`\n=== resetPasswordForEmail (${testEmail}) ===`);
     console.log(error ? `Error: ${error.message}` : 'OK — Supabase accepted the request');
