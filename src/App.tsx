@@ -6,8 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { EmployeeAuthProvider, useEmployeeAuth } from "@/contexts/EmployeeAuthContext";
-import Onboarding from "./pages/Onboarding";
-import Index from "./pages/Index";
+import VggWorkspacePortal from "./pages/VggWorkspacePortal";
+import CompanyWorkspaceEntry from "./pages/CompanyWorkspaceEntry";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import FindAccount from "./pages/FindAccount";
 import ResetPassword from "./pages/ResetPassword";
@@ -24,6 +24,8 @@ import { AppBootstrapSkeleton } from "@/components/shell/LoadingShells";
 import { TenantProvider, useTenant } from "@/tenants/TenantContext";
 import TenantSubsidiaryBridge from "@/tenants/TenantSubsidiaryBridge";
 import TenantLockEnforcer from "@/tenants/TenantLockEnforcer";
+import LocalDevBanner from "@/components/LocalDevBanner";
+import { isApexHostname, isTenantSubdomainHost } from "@/tenants/config";
 
 const queryClient = new QueryClient();
 
@@ -76,7 +78,19 @@ function AdminGate() {
 function HomeRoute() {
   const { isAuthenticated: isEmployee, isLoading } = useEmployeeAuth();
   if (isLoading) return <AppBootstrapSkeleton />;
-  return isEmployee ? <Navigate to="/hub?tab=survey" replace /> : <Onboarding />;
+  if (isEmployee) return <Navigate to="/hub?tab=survey" replace />;
+
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const tenantOverride = params.get('tenant');
+
+  if (isApexHostname(hostname) && !tenantOverride) {
+    return <VggWorkspacePortal />;
+  }
+  if (isTenantSubdomainHost(hostname) || tenantOverride) {
+    return <CompanyWorkspaceEntry />;
+  }
+  return <VggWorkspacePortal />;
 }
 
 function LoginRoute() {
@@ -99,7 +113,8 @@ function AppRoutes() {
       <Route path="/mvp" element={<MvpDemo />} />
       <Route path="/" element={<HomeRoute />} />
       <Route path="/login" element={<LoginRoute />} />
-      <Route path="/landing" element={<Index />} />
+      <Route path="/landing" element={<Navigate to="/" replace />} />
+      <Route path="/onboarding" element={<Navigate to="/" replace />} />
       <Route path="/find-account" element={<FindAccount />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/hub" element={<ProtectedEmployeeRoute><EmployeeHub /></ProtectedEmployeeRoute>} />
@@ -142,6 +157,7 @@ const App = () => (
               <TenantSubsidiaryBridge>
                 <TenantLockEnforcer>
                 <AuthProvider>
+                  <LocalDevBanner />
                   <AppRoutes />
                 </AuthProvider>
                 </TenantLockEnforcer>

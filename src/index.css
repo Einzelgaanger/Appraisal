@@ -278,6 +278,125 @@
 
   .app-page-grid { display: none; }
 
+  .workspace-portal-shell {
+    @apply relative flex h-dvh max-h-dvh w-full flex-col overflow-hidden;
+    --portal-accent: 145 63% 42%;
+    background-color: hsl(var(--paper-deep));
+  }
+
+  .workspace-portal-shell--executive { --portal-accent: 145 55% 32%; }
+  .workspace-portal-shell--ghc { --portal-accent: 175 55% 28%; }
+  .workspace-portal-shell--vigipay { --portal-accent: 192 100% 22%; }
+
+  .workspace-portal-bg {
+    @apply pointer-events-none absolute inset-0;
+    background-image:
+      linear-gradient(hsl(var(--portal-accent) / 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--portal-accent) / 0.07) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse 95% 85% at 40% 30%, black 15%, transparent 70%);
+  }
+
+  .workspace-portal-glow {
+    @apply pointer-events-none absolute inset-0;
+    background:
+      radial-gradient(ellipse 70% 50% at 15% 0%, hsl(var(--portal-accent) / 0.22), transparent 55%),
+      radial-gradient(ellipse 55% 45% at 95% 15%, hsl(38 75% 52% / 0.14), transparent 50%),
+      radial-gradient(ellipse 50% 55% at 0% 100%, hsl(175 50% 38% / 0.16), transparent 48%),
+      linear-gradient(135deg, hsl(var(--paper-deep)) 0%, hsl(145 20% 94%) 45%, hsl(154 25% 91%) 100%);
+  }
+
+  .workspace-portal-orb {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+    animation: portal-orb-drift 18s ease-in-out infinite alternate;
+  }
+
+  .workspace-portal-orb-a {
+    width: min(42vw, 320px);
+    height: min(42vw, 320px);
+    top: 8%;
+    right: -8%;
+    background: hsl(var(--portal-accent) / 0.2);
+  }
+
+  .workspace-portal-orb-b {
+    width: min(36vw, 260px);
+    height: min(36vw, 260px);
+    bottom: 12%;
+    left: -6%;
+    background: hsl(38 70% 55% / 0.12);
+    animation-delay: -6s;
+  }
+
+  @keyframes portal-orb-drift {
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(-12px, 16px) scale(1.06); }
+  }
+
+  .workspace-portal-rail {
+    @apply absolute left-0 top-0 z-[1] h-full w-1 sm:w-1.5;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--portal-accent) / 0.15) 0%,
+      hsl(var(--portal-accent)) 35%,
+      hsl(var(--portal-accent) / 0.4) 100%
+    );
+  }
+
+  .workspace-portal-card {
+    @apply relative overflow-hidden rounded-2xl border border-border/80 bg-card/85 shadow-[0_8px_32px_hsl(var(--portal-accent)/0.12)] backdrop-blur-md transition-all duration-300;
+  }
+
+  .workspace-portal-card:hover {
+    @apply -translate-y-0.5 border-primary/35 shadow-[0_14px_40px_hsl(var(--portal-accent)/0.18)];
+  }
+
+  .workspace-portal-card-accent {
+    @apply absolute inset-x-0 top-0 h-1;
+    background: linear-gradient(90deg, hsl(var(--portal-accent)), hsl(var(--portal-accent) / 0.45));
+  }
+
+  .workspace-portal-hero-strip {
+    @apply relative shrink-0 overflow-hidden border-b border-border/70;
+  }
+
+  .workspace-portal-hero-strip img {
+    @apply h-full w-full object-cover;
+  }
+
+  .workspace-portal-hero-strip::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--portal-accent) / 0.25) 0%,
+      hsl(var(--paper-deep) / 0.92) 100%
+    );
+  }
+
+  .workspace-portal-editorial-panel {
+    @apply relative flex min-h-0 flex-col border-border/70 bg-paper-deep/50 lg:border-l;
+  }
+
+  .workspace-portal-photo-frame {
+    @apply ink-frame relative min-h-0 flex-1 overflow-hidden m-5 xl:m-8;
+  }
+
+  .workspace-portal-photo-frame img {
+    @apply absolute inset-0 h-full w-full object-cover;
+  }
+
+  .workspace-portal-photo-frame::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      to top,
+      hsl(var(--paper-deep) / 0.95) 0%,
+      transparent 45%,
+      hsl(var(--portal-accent) / 0.12) 100%
+    );
+  }
+
   .app-container {
     @apply mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-8 sm:py-10;
   }

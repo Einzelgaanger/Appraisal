@@ -1,4 +1,4 @@
-export type TenantModule = 'appraisal';
+export type TenantModule = 'appraisal' | 'projects' | 'leave';
 
 export type AppraisalMode = 'boom' | 'ghc' | 'vigipay' | 'legacy';
 

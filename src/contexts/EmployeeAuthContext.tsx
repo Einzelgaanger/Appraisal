@@ -39,21 +39,23 @@ async function loadCompanyContext(employeeId: string | null | undefined) {
   const { data: companyRows } = await db.rpc('my_companies');
   const companies = (companyRows ?? []) as Company[];
 
+  const active = companies.find((c) => c.is_active) ?? companies[0];
+  const activeEmployeeId = active?.employee_id ?? employeeId ?? null;
+
   let companyAdmin = false;
   let staticLock: string | null = null;
 
-  if (employeeId) {
+  if (activeEmployeeId) {
     const { data } = await supabase
       .from('employees')
       .select('locked_tenant_slug, company_admin')
-      .eq('id', employeeId)
+      .eq('id', activeEmployeeId)
       .maybeSingle();
     const row = data as { locked_tenant_slug?: string | null; company_admin?: boolean | null } | null;
     companyAdmin = !!row?.company_admin;
     staticLock = row?.locked_tenant_slug?.trim().toLowerCase() || null;
   }
 
-  const active = companies.find((c) => c.is_active) ?? companies[0];
   return { companies, companyAdmin, lock: active?.tenant_slug ?? staticLock };
 }
 
@@ -62,7 +64,10 @@ interface EmployeeAuthContextType {
   session: Session | null;
   profile: Profile | null;
   isAuthenticated: boolean;
+  /** Platform admin (user_roles) or company People Ops admin on the active roster row. */
   isAdmin: boolean;
+  /** Global platform admin only (`user_roles.admin`). */
+  isPlatformAdmin: boolean;
   /** Company-scoped admin (VigiPay People Ops / GM) — not global platform admin. */
   isCompanyAdmin: boolean;
   /** Every company this login may act as. More than one means the switcher applies. */
@@ -89,6 +94,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
   const [lockedTenantSlug, setLockedTenantSlug] = useState<string | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -121,6 +127,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setProfile(null);
         setIsAdmin(false);
+        setIsPlatformAdmin(false);
         setIsCompanyAdmin(false);
         setLockedTenantSlug(null);
         setCompanies([]);
@@ -182,7 +189,9 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       setCompanies(myCompanies);
       setIsCompanyAdmin(companyAdmin);
       setLockedTenantSlug(lock);
-      setIsAdmin(!!roleData || companyAdmin);
+      const platformAdmin = !!roleData;
+      setIsPlatformAdmin(platformAdmin);
+      setIsAdmin(platformAdmin || companyAdmin);
       setProfileLoading(false);
     };
 
@@ -209,7 +218,9 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     setCompanies(myCompanies);
     setIsCompanyAdmin(companyAdmin);
     setLockedTenantSlug(lock);
-    setIsAdmin(!!roleData || companyAdmin);
+    const platformAdmin = !!roleData;
+    setIsPlatformAdmin(platformAdmin);
+    setIsAdmin(platformAdmin || companyAdmin);
     setProfileLoading(false);
   };
 
@@ -239,6 +250,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
+    setIsPlatformAdmin(false);
     setIsCompanyAdmin(false);
     setLockedTenantSlug(null);
     setProfileLoading(false);
@@ -268,6 +280,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
         user, session, profile,
         isAuthenticated: !!session,
         isAdmin,
+        isPlatformAdmin,
         isCompanyAdmin,
         companies,
         switchCompany,

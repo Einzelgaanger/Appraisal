@@ -29,9 +29,12 @@ function formatReleased(iso: string | null | undefined) {
 export default function GhcAdminMonitor({
   periodQuarter,
   periodMonth,
+  hrMode = false,
 }: {
   periodQuarter: string;
   periodMonth: string;
+  /** People Ops (company admin) — plainer copy, same capabilities. */
+  hrMode?: boolean;
 }) {
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [roster, setRoster] = useState<Array<{
@@ -158,6 +161,16 @@ export default function GhcAdminMonitor({
 
   return (
     <div className="space-y-4">
+      {hrMode && (
+        <div className="glass-panel p-4 border-l-4 border-l-primary">
+          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">People Ops workspace</p>
+          <h3 className="text-base font-semibold mt-1">HR monitor — {periodQuarter}</h3>
+          <p className="text-xs text-muted-foreground mt-2 max-w-2xl leading-relaxed">
+            See who has finished self check-in and 360, release aggregated peer results when the cycle is ready, and
+            review named 360 responses below (HR-only). Employees still see anonymous aggregates after release.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: 'Roster', value: summary?.roster ?? 0 },

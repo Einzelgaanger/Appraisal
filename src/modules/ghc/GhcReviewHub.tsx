@@ -44,9 +44,16 @@ interface Props {
   employeeId: string | null;
   employeeName?: string | null;
   isPlatformAdmin?: boolean;
+  isCompanyAdmin?: boolean;
 }
 
-export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin = false }: Props) {
+export default function GhcReviewHub({
+  employeeId,
+  employeeName,
+  isPlatformAdmin = false,
+  isCompanyAdmin = false,
+}: Props) {
+  const canUseHrMonitor = isPlatformAdmin || isCompanyAdmin;
   const { tenant } = useTenant();
   // This hub is shared by every GHC-style tenant, so all copy names the active company.
   const org = tenant.branding.fullName;
@@ -215,6 +222,19 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
         </div>
       </div>
 
+      {canUseHrMonitor && isCompanyAdmin && !isPlatformAdmin && tab !== 'admin' && (
+        <div className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p>
+            <span className="font-medium">People Ops / HR</span>
+            {' — '}track Q3 completion, release peer 360 when ready, and review named feedback in{' '}
+            <strong>HR Monitor</strong>.
+          </p>
+          <Button size="sm" variant="secondary" className="shrink-0 h-8" onClick={() => setTab('admin')}>
+            Open HR Monitor
+          </Button>
+        </div>
+      )}
+
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex h-auto flex-wrap gap-1 bg-muted/50 p-1">
           <TabsTrigger value="tasks" className="text-xs gap-1"><ClipboardList className="w-3 h-3" /> Tasks</TabsTrigger>
@@ -223,8 +243,8 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
           {ENABLE_APP_AI && (
             <TabsTrigger value="assist" className="text-xs gap-1"><Sparkles className="w-3 h-3" /> AI assist</TabsTrigger>
           )}
-          {isPlatformAdmin && (
-            <TabsTrigger value="admin" className="text-xs gap-1"><LayoutDashboard className="w-3 h-3" /> Monitor</TabsTrigger>
+          {canUseHrMonitor && (
+            <TabsTrigger value="admin" className="text-xs gap-1"><LayoutDashboard className="w-3 h-3" /> {isCompanyAdmin && !isPlatformAdmin ? 'HR Monitor' : 'Monitor'}</TabsTrigger>
           )}
         </TabsList>
 
@@ -325,9 +345,13 @@ export default function GhcReviewHub({ employeeId, employeeName, isPlatformAdmin
           </TabsContent>
         )}
 
-        {isPlatformAdmin && (
+        {canUseHrMonitor && (
           <TabsContent value="admin" className="mt-0">
-            <GhcAdminMonitor periodQuarter={periodQuarter} periodMonth={periodMonth} />
+            <GhcAdminMonitor
+              periodQuarter={periodQuarter}
+              periodMonth={periodMonth}
+              hrMode={isCompanyAdmin && !isPlatformAdmin}
+            />
           </TabsContent>
         )}
       </Tabs>

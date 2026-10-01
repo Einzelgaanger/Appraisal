@@ -37,7 +37,7 @@ export const TENANTS: TenantConfig[] = [
     // Production: executive.vgg.tools
     subdomains: ['executive', 'executiveteam', 'appraisal'],
     subsidiaryId: EXECUTIVE_TEAM_SUBSIDIARY_ID,
-    modules: ['appraisal'],
+    modules: ['appraisal', 'projects', 'leave'],
     appraisalMode: 'boom',
     teamMemberMinLevel: 2,
     branding: {
@@ -51,7 +51,7 @@ export const TENANTS: TenantConfig[] = [
     slug: 'ghc',
     subdomains: ['ghc', 'greenhousecapital', 'greenhouse-capital'],
     subsidiaryId: GHC_SUBSIDIARY_ID,
-    modules: ['appraisal'],
+    modules: ['appraisal', 'projects', 'leave'],
     appraisalMode: 'ghc',
     teamMemberMinLevel: 3,
     branding: {
@@ -80,7 +80,7 @@ export const TENANTS: TenantConfig[] = [
     slug: 'vigipay',
     subdomains: ['vigipay'],
     subsidiaryId: VIGIPAY_SUBSIDIARY_ID,
-    modules: ['appraisal'],
+    modules: ['appraisal', 'projects', 'leave'],
     appraisalMode: 'vigipay',
     teamMemberMinLevel: 3,
     branding: {
@@ -113,6 +113,34 @@ function normalizeHostname(hostname: string): string {
   const base = hostname.toLowerCase().split(':')[0];
   if (base === '127.0.0.1') return 'localhost';
   return base;
+}
+
+/** Apex host (vgg.tools) — company picker, not a single-tenant workspace. */
+export function isApexHostname(hostname: string): boolean {
+  const h = normalizeHostname(hostname);
+  if (h === 'localhost') return true;
+  if (h === PRODUCTION_BASE_DOMAIN || h === `www.${PRODUCTION_BASE_DOMAIN}`) return true;
+  return false;
+}
+
+/** True when the host maps to a known tenant subdomain (executive / ghc / vigipay). */
+export function isTenantSubdomainHost(hostname: string): boolean {
+  if (isApexHostname(hostname)) return false;
+  const subdomain = extractSubdomain(hostname);
+  return TENANTS.some((tenant) => tenant.subdomains.includes(subdomain));
+}
+
+export function getApexProductionOrigin(): string {
+  return `https://${PRODUCTION_BASE_DOMAIN}`;
+}
+
+/** Where to send someone for a tenant (subdomain in prod, ?tenant= on localhost). */
+export function getTenantEntryUrl(tenant: TenantConfig, origin = typeof window !== 'undefined' ? window.location.origin : getApexProductionOrigin()): string {
+  const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+  if (isLocal) {
+    return `${origin}/?tenant=${tenant.slug}`;
+  }
+  return `${getTenantProductionOrigin(tenant)}/`;
 }
 
 function extractSubdomain(hostname: string): string {

@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
@@ -44,6 +45,8 @@ type SidebarItem = {
   to?: string;
   onClick?: () => void;
   active?: boolean;
+  /** Nested destinations under a collapsible group (e.g. Appraisal). */
+  children?: SidebarItem[];
 };
 
 type SidebarMetaItem = {
@@ -180,52 +183,9 @@ export default function PlatformSidebar({
         )}
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" aria-label="Sidebar Navigation">
-          {items.map((item) => {
-            const className = cn(
-              'relative w-full justify-start gap-2.5 rounded-sm font-mono text-[11px] uppercase tracking-[0.16em]',
-              item.active
-                ? chrome
-                  ? cn(chrome.active, chrome.activeHover, 'text-white hover:text-white')
-                  : 'bg-foreground text-background hover:bg-foreground hover:text-background'
-                : branded
-                  ? 'text-white/70 hover:text-white hover:bg-white/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-paper-deep/60',
-            );
-            const activeBar = item.active ? (
-              <span
-                className={cn(
-                  'absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2',
-                  chrome ? chrome.rail : 'bg-primary',
-                )}
-              />
-            ) : null;
-
-            if (item.to) {
-              return (
-                <Button key={item.key} variant="ghost" size="sm" asChild className={className}>
-                  <Link to={item.to}>
-                    {activeBar}
-                    {item.icon}
-                    {item.label}
-                  </Link>
-                </Button>
-              );
-            }
-
-            return (
-              <Button
-                key={item.key}
-                variant="ghost"
-                size="sm"
-                className={className}
-                onClick={item.onClick}
-              >
-                {activeBar}
-                {item.icon}
-                {item.label}
-              </Button>
-            );
-          })}
+          {items.map((item) => (
+            <SidebarNavItem key={item.key} item={item} chrome={chrome} branded={branded} />
+          ))}
         </nav>
 
         <div className={cn('px-4 py-4 border-t space-y-2', branded ? 'border-white/15' : 'border-border')}>
@@ -264,5 +224,115 @@ export default function PlatformSidebar({
         </header>
       )}
     </>
+  );
+}
+
+function SidebarNavItem({
+  item,
+  chrome,
+  branded,
+}: {
+  item: SidebarItem;
+  chrome: (typeof BRANDED_CHROME)[string] | undefined;
+  branded: boolean;
+}) {
+  const childActive = Boolean(item.children?.some((child) => child.active));
+  const [open, setOpen] = useState(childActive);
+  useEffect(() => {
+    setOpen(childActive);
+  }, [childActive]);
+
+  const itemClass = (active: boolean) =>
+    cn(
+      'relative w-full justify-start gap-2.5 rounded-sm font-mono text-[11px] uppercase tracking-[0.16em]',
+      active
+        ? chrome
+          ? cn(chrome.active, chrome.activeHover, 'text-white hover:text-white')
+          : 'bg-foreground text-background hover:bg-foreground hover:text-background'
+        : branded
+          ? 'text-white/70 hover:text-white hover:bg-white/10'
+          : 'text-muted-foreground hover:text-foreground hover:bg-paper-deep/60',
+    );
+
+  const activeBar = (active: boolean) =>
+    active ? (
+      <span
+        className={cn(
+          'absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2',
+          chrome ? chrome.rail : 'bg-primary',
+        )}
+      />
+    ) : null;
+
+  if (item.children?.length) {
+    return (
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            itemClass(false),
+            childActive && (branded ? 'text-white' : 'text-foreground'),
+          )}
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+        >
+          {item.icon}
+          <span className="flex-1 text-left">{item.label}</span>
+          <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open ? 'rotate-0' : '-rotate-90')} />
+        </Button>
+        {open && (
+          <div className="ml-2 mt-0.5 space-y-0.5 border-l border-white/15 pl-1" style={branded ? undefined : { borderColor: 'hsl(var(--border))' }}>
+            {item.children.map((child) => {
+              if (child.to) {
+                return (
+                  <Button key={child.key} variant="ghost" size="sm" asChild className={itemClass(Boolean(child.active))}>
+                    <Link to={child.to}>
+                      {activeBar(Boolean(child.active))}
+                      {child.icon}
+                      {child.label}
+                    </Link>
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  key={child.key}
+                  variant="ghost"
+                  size="sm"
+                  className={itemClass(Boolean(child.active))}
+                  onClick={child.onClick}
+                >
+                  {activeBar(Boolean(child.active))}
+                  {child.icon}
+                  {child.label}
+                </Button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (item.to) {
+    return (
+      <Button variant="ghost" size="sm" asChild className={itemClass(Boolean(item.active))}>
+        <Link to={item.to}>
+          {activeBar(Boolean(item.active))}
+          {item.icon}
+          {item.label}
+        </Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button variant="ghost" size="sm" className={itemClass(Boolean(item.active))} onClick={item.onClick}>
+      {activeBar(Boolean(item.active))}
+      {item.icon}
+      {item.label}
+    </Button>
   );
 }

@@ -343,6 +343,23 @@ export async function ghcListAccessibleEvaluations(periodQuarter: string) {
   }>;
 }
 
+export async function groupCompaniesAppraisalOverview(periodQuarter: string, periodMonth: string) {
+  const { data, error } = await db.rpc('group_companies_appraisal_overview', {
+    _period_quarter: periodQuarter,
+    _period_month: periodMonth,
+  });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    employee_id: string;
+    company_name: string;
+    tenant_slug: string | null;
+    appraisal_mode: string | null;
+    employee_role: string | null;
+    ghc_stats: Record<string, unknown> | null;
+    executive_stats: Record<string, unknown> | null;
+  }>;
+}
+
 export async function ghcAiDraftAssist(context: string) {
   // Deterministic local draft — the chat edge function returns SSE for the admin panel,
   // which is not usable from a simple invoke. Keep assist helpful offline for managers.

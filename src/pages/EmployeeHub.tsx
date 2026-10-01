@@ -9,12 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import PlatformSidebar from '@/components/PlatformSidebar';
+import CompanySwitcher from '@/components/CompanySwitcher';
+import GroupCompaniesOverview from '@/components/GroupCompaniesOverview';
 import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
   Building2, User, ClipboardList, Send, Loader2, Shield,
   BarChart3, Trophy, Star, Users, Search, X, ArrowUp, ArrowDown, ArrowLeftRight, Sparkles, MessageSquare,
+  FolderKanban, CalendarRange,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -41,12 +44,14 @@ import BoomNotificationsBell from '@/components/boom/BoomNotificationsBell';
 import GhcReviewHub from '@/modules/ghc/GhcReviewHub';
 import GhcNotificationsBell from '@/modules/ghc/GhcNotificationsBell';
 import GhcMyResults from '@/modules/ghc/GhcMyResults';
+import ProjectsWorkspace from '@/modules/workspace/ProjectsWorkspace';
+import LeavePlanner from '@/modules/workspace/LeavePlanner';
 import {
   displayHierarchyLabel,
   getSurveyFeedbackDirection,
   assignHierarchyPool,
 } from '@/lib/hierarchyConvention';
-import { defaultQuarterPeriod } from '@/lib/boomPeriods';
+import { defaultQuarterPeriod, resolveQuarterPeriod } from '@/lib/boomPeriods';
 import { fetchMyAggregatedPeer360Scores, fetchMy360Dashboard, fetchOrgPerformanceRankings, fetchGrowthHubPulse, buildBoomGrowthAiContext, type GrowthHubPulseMode } from '@/lib/boomDashboard360';
 import { fetchMyEaQuarterlyResults, type EaQuarterlyResults } from '@/lib/boomEaQuarterly';
 import { isMeaningfulQualitativeAnswer } from '@/lib/qualitativeFeedback';
@@ -84,7 +89,7 @@ const pageTransition = {
 };
 
 export default function EmployeeHub() {
-  const { user, profile, isAdmin, logout } = useEmployeeAuth();
+  const { user, profile, isAdmin, isPlatformAdmin, isCompanyAdmin, companies, logout } = useEmployeeAuth();
   const { tenant } = useTenant();
   const brand = getTenantBrandAssets(tenant);
   const navigate = useNavigate();
@@ -94,6 +99,26 @@ export default function EmployeeHub() {
   const showGrowthHub = tenant.capabilities.showGrowthHub;
   const boomMode = isBoomTenant(tenant);
   const ghcMode = isGhcStyleAppraisal(tenant);
+  const hubQuarter = resolveQuarterPeriod(
+    searchParams.get(ghcMode ? 'ghcQuarter' : boomMode ? 'boomQuarter' : null),
+  );
+  const showGroupOverview = companies.length >= 2;
+
+  // Default appraisal quarter in the URL (Q3 cycle) for shareable EO / GHC / VigiPay links.
+  useEffect(() => {
+    if (!ghcMode && !boomMode) return;
+    const key = ghcMode ? 'ghcQuarter' : 'boomQuarter';
+    if (searchParams.get(key)) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set(key, defaultQuarterPeriod());
+        if (ghcMode && !next.get('tenant')) next.set('tenant', tenant.slug);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [boomMode, ghcMode, searchParams, setSearchParams, tenant.slug]);
 
   // Keep shareable URLs on the GHC-style tenant (GHC or VigiPay).
   useEffect(() => {
@@ -923,7 +948,22 @@ export default function EmployeeHub() {
   }, [myScores]);
 
   const setTab = (tab: string) => {
-    setSearchParams({ tab });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      if (tab !== 'projects') next.delete('project');
+      return next;
+    });
+  };
+
+  const openProject = (id: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', 'projects');
+      if (id) next.set('project', id);
+      else next.delete('project');
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -966,27 +1006,53 @@ export default function EmployeeHub() {
         ]}
         onLogout={handleLogout}
         items={[
-          { key: 'survey', label: 'Appraisal', icon: <ClipboardList className="w-4 h-4" />, active: activeTab === 'survey', onClick: () => setTab('survey') },
-          { key: 'dashboard', label: 'My Dashboard', icon: <BarChart3 className="w-4 h-4" />, active: activeTab === 'dashboard', onClick: () => setTab('dashboard') },
           {
-            key: 'growth',
-            label: 'Growth Hub',
-            icon: <img src={brand.faviconHref} alt="Growth Hub" className="w-4 h-4 rounded-sm object-contain" />,
-            active: activeTab === 'growth',
-            onClick: () => setTab('growth')
+            key: 'appraisal-group',
+            label: 'Appraisal',
+            icon: <ClipboardList className="w-4 h-4" />,
+            children: [
+              { key: 'survey', label: 'Reviews', icon: <ClipboardList className="w-4 h-4" />, active: activeTab === 'survey', onClick: () => setTab('survey') },
+              { key: 'dashboard', label: 'My Dashboard', icon: <BarChart3 className="w-4 h-4" />, active: activeTab === 'dashboard', onClick: () => setTab('dashboard') },
+              {
+                key: 'growth',
+                label: 'Growth Hub',
+                icon: <img src={brand.faviconHref} alt="Growth Hub" className="w-4 h-4 rounded-sm object-contain" />,
+                active: activeTab === 'growth',
+                onClick: () => setTab('growth'),
+              },
+              ...(showRankings
+                ? [{ key: 'rankings', label: 'Rankings', icon: <Trophy className="w-4 h-4" />, active: activeTab === 'rankings', onClick: () => setTab('rankings') }]
+                : []),
+              ...(showGroupOverview
+                ? [{
+                    key: 'group',
+                    label: 'Group overview',
+                    icon: <Building2 className="w-4 h-4" />,
+                    active: activeTab === 'group',
+                    onClick: () => setTab('group'),
+                  }]
+                : []),
+            ],
           },
-          ...(showRankings
-            ? [{ key: 'rankings', label: 'Rankings', icon: <Trophy className="w-4 h-4" />, active: activeTab === 'rankings', onClick: () => setTab('rankings') }]
-            : []),
+          { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, active: activeTab === 'projects', onClick: () => setTab('projects') },
+          { key: 'leave', label: 'Leave planner', icon: <CalendarRange className="w-4 h-4" />, active: activeTab === 'leave', onClick: () => setTab('leave') },
         ]}
         actions={
           <>
             {ghcMode ? <GhcNotificationsBell /> : <BoomNotificationsBell />}
-            {isAdmin && (
+            {isPlatformAdmin && (
               <Button variant="outline" size="sm" asChild className="w-full gap-2 border-primary/30 text-primary">
-                <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin</Link>
+                <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin console</Link>
               </Button>
             )}
+            {ghcMode && isCompanyAdmin && !isPlatformAdmin && (
+              <Button variant="outline" size="sm" asChild className="w-full gap-2 border-primary/30 text-primary">
+                <Link to={`/hub?tab=survey&tenant=${tenant.slug}&ghcTab=admin&ghcQuarter=${hubQuarter}`}>
+                  <Shield className="w-4 h-4" /> HR Monitor
+                </Link>
+              </Button>
+            )}
+            {showGroupOverview && <CompanySwitcher branded={false} />}
             <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-muted-foreground px-1">
               <Shield className="w-3.5 h-3.5" />
               <span>Anonymous</span>
@@ -1008,13 +1074,20 @@ export default function EmployeeHub() {
                   : activeTab === 'dashboard' ? 'My Dashboard'
                   : activeTab === 'growth' && showGrowthHub ? 'Growth Hub'
                   : activeTab === 'rankings' ? 'Rankings'
+                  : activeTab === 'projects' ? 'Projects'
+                  : activeTab === 'leave' ? 'Leave planner'
                   : activeTab === 'profile' ? 'Profile'
                   : 'Appraisal'}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {ghcMode ? <GhcNotificationsBell compact /> : <BoomNotificationsBell compact />}
-            {isAdmin && (
+            {showGroupOverview && (
+              <div className="max-w-[140px] scale-90 origin-right">
+                <CompanySwitcher />
+              </div>
+            )}
+            {isPlatformAdmin && (
               <Link to="/appraisal" aria-label="Admin" className="text-muted-foreground hover:text-primary p-2">
                 <Shield className="w-4 h-4" />
               </Link>
@@ -1033,7 +1106,8 @@ export default function EmployeeHub() {
               <GhcReviewHub
                 employeeId={currentEmployee?.id ?? null}
                 employeeName={currentEmployee?.name ?? profile?.name ?? null}
-                isPlatformAdmin={isAdmin}
+                isPlatformAdmin={isPlatformAdmin}
+                isCompanyAdmin={isCompanyAdmin}
               />
             ) : (
               <BoomReviewHub
@@ -1043,16 +1117,22 @@ export default function EmployeeHub() {
                 reviewerRole={currentEmployee?.role ?? profile?.role ?? null}
                 reviewerDepartment={currentEmployee?.department ?? profile?.department ?? null}
                 reviewerEmail={profile?.email ?? user?.email ?? null}
-                isPlatformAdmin={isAdmin}
+                isPlatformAdmin={isPlatformAdmin}
               />
             )}
           </TabsContent>
+
+          {showGroupOverview && (
+            <TabsContent value="group" className="mt-4">
+              <GroupCompaniesOverview periodQuarter={hubQuarter} />
+            </TabsContent>
+          )}
 
           {/* ============ DASHBOARD TAB ============ */}
           <TabsContent value="dashboard" className="mt-4">
             {ghcMode ? (
               <GhcMyResults
-                periodQuarter={defaultQuarterPeriod()}
+                periodQuarter={hubQuarter}
                 acknowledgeTask={null}
                 onAcknowledged={() => undefined}
               />
@@ -1593,6 +1673,18 @@ export default function EmployeeHub() {
           </TabsContent>
           )}
 
+          <TabsContent value="projects" className="mt-4">
+            <ProjectsWorkspace
+              employeeId={currentEmployee?.id ?? profile?.employee_id ?? null}
+              projectId={searchParams.get('project')}
+              onOpenProject={openProject}
+            />
+          </TabsContent>
+
+          <TabsContent value="leave" className="mt-4">
+            <LeavePlanner employeeId={currentEmployee?.id ?? profile?.employee_id ?? null} />
+          </TabsContent>
+
           {/* ============ PROFILE TAB (mobile-only entry from bottom bar) ============ */}
           <TabsContent value="profile" className="mt-4 lg:hidden">
             <div className="surface-card p-5 space-y-5">
@@ -1606,9 +1698,21 @@ export default function EmployeeHub() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Department</span><span className="font-medium">{currentEmployee?.department ?? profile?.department ?? 'Unassigned'}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Role</span><span className="font-medium">{currentEmployee?.role ?? 'Employee'}</span></div>
               </div>
-              {isAdmin && (
+              {showGroupOverview && (
+                <Button variant="outline" asChild className="w-full gap-2">
+                  <Link to="/hub?tab=group"><Building2 className="w-4 h-4" /> Group overview</Link>
+                </Button>
+              )}
+              {isPlatformAdmin && (
                 <Button variant="outline" asChild className="w-full gap-2 border-primary/30 text-primary">
                   <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin Console</Link>
+                </Button>
+              )}
+              {ghcMode && isCompanyAdmin && !isPlatformAdmin && (
+                <Button variant="outline" asChild className="w-full gap-2 border-primary/30 text-primary">
+                  <Link to={`/hub?tab=survey&tenant=${tenant.slug}&ghcTab=admin&ghcQuarter=${hubQuarter}`}>
+                    <Shield className="w-4 h-4" /> HR Monitor
+                  </Link>
                 </Button>
               )}
               <Button variant="outline" onClick={handleLogout} className="w-full">Sign Out</Button>

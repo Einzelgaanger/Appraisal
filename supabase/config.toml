@@ -1,5 +1,37 @@
 project_id = "qnorggoycwbbxdlvbcvq"
 
+[api]
+enabled = true
+port = 54331
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54332
+shadow_port = 54330
+
+[studio]
+enabled = true
+port = 54333
+
+[inbucket]
+enabled = true
+port = 54334
+
+[analytics]
+enabled = true
+port = 54337
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:8080"
+additional_redirect_urls = ["http://localhost:8080", "http://127.0.0.1:8080"]
+enable_signup = true
+
+[auth.email]
+enable_confirmations = false
+
 [functions]
   [functions.auth-email-hook]
     verify_jwt = false
