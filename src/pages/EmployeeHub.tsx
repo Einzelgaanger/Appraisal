@@ -46,6 +46,7 @@ import GhcNotificationsBell from '@/modules/ghc/GhcNotificationsBell';
 import GhcMyResults from '@/modules/ghc/GhcMyResults';
 import ProjectsWorkspace from '@/modules/workspace/ProjectsWorkspace';
 import LeavePlanner from '@/modules/workspace/LeavePlanner';
+import MyProfilePanel from '@/components/MyProfilePanel';
 import {
   displayHierarchyLabel,
   getSurveyFeedbackDirection,
@@ -1036,6 +1037,7 @@ export default function EmployeeHub() {
           },
           { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, active: activeTab === 'projects', onClick: () => setTab('projects') },
           { key: 'leave', label: 'Leave planner', icon: <CalendarRange className="w-4 h-4" />, active: activeTab === 'leave', onClick: () => setTab('leave') },
+          { key: 'profile', label: 'My profile', icon: <User className="w-4 h-4" />, active: activeTab === 'profile', onClick: () => setTab('profile') },
         ]}
         actions={
           <>
@@ -1076,7 +1078,7 @@ export default function EmployeeHub() {
                   : activeTab === 'rankings' ? 'Rankings'
                   : activeTab === 'projects' ? 'Projects'
                   : activeTab === 'leave' ? 'Leave planner'
-                  : activeTab === 'profile' ? 'Profile'
+                  : activeTab === 'profile' ? 'My profile'
                   : 'Appraisal'}
             </span>
           </div>
@@ -1685,19 +1687,16 @@ export default function EmployeeHub() {
             <LeavePlanner employeeId={currentEmployee?.id ?? profile?.employee_id ?? null} />
           </TabsContent>
 
-          {/* ============ PROFILE TAB (mobile-only entry from bottom bar) ============ */}
-          <TabsContent value="profile" className="mt-4 lg:hidden">
-            <div className="surface-card p-5 space-y-5">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">◉ Account</p>
-                <h2 className="font-display text-2xl font-medium">{profile?.name ?? 'Employee'}</h2>
-                <p className="text-sm text-muted-foreground mt-1">{profile?.email}</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2 text-sm border-t border-border pt-4">
-                <div className="flex justify-between"><span className="text-muted-foreground">Subsidiary</span><span className="font-medium">{currentEmployeeSubsidiary ?? 'Unlisted'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Department</span><span className="font-medium">{currentEmployee?.department ?? profile?.department ?? 'Unassigned'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Role</span><span className="font-medium">{currentEmployee?.role ?? 'Employee'}</span></div>
-              </div>
+          {/* ============ PROFILE TAB ============ */}
+          <TabsContent value="profile" className="mt-4">
+            <div className="space-y-4 max-w-3xl">
+              <MyProfilePanel
+                companyName={currentEmployeeSubsidiary ?? null}
+                employeeRole={currentEmployee?.role ?? profile?.role ?? null}
+                employeeDepartment={currentEmployee?.department ?? profile?.department ?? null}
+                employeeName={currentEmployee?.name ?? profile?.name ?? null}
+                onSaved={() => void loadData()}
+              />
               {showGroupOverview && (
                 <Button variant="outline" asChild className="w-full gap-2">
                   <Link to="/hub?tab=group"><Building2 className="w-4 h-4" /> Group overview</Link>
@@ -1715,7 +1714,7 @@ export default function EmployeeHub() {
                   </Link>
                 </Button>
               )}
-              <Button variant="outline" onClick={handleLogout} className="w-full">Sign Out</Button>
+              <Button variant="outline" onClick={handleLogout} className="w-full lg:hidden">Sign Out</Button>
             </div>
           </TabsContent>
         </Tabs>

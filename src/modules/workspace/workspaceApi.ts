@@ -80,6 +80,8 @@ export type WorkspaceColleague = {
   name: string;
   role: string | null;
   email: string | null;
+  department: string | null;
+  avatar_url: string | null;
 };
 
 function rpcError(error: { message?: string } | null): never {

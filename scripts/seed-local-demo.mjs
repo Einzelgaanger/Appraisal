@@ -71,7 +71,7 @@ const TASK_TITLES = [
   'File the final version',
 ];
 
-const LEAVE_TYPES = ['annual', 'sick', 'unpaid', 'parental', 'compassionate'];
+const LEAVE_TYPES = ['annual', 'compassionate', 'maternity', 'study'];
 const LEAVE_NOTES = [
   'Family visit',
   'Clinic appointment',
@@ -179,32 +179,57 @@ async function seedLeave(local, bySub) {
   }
   await local.query(`TRUNCATE TABLE public.workspace_leave_requests CASCADE`);
   const today = new Date();
+  const q = Math.floor(today.getMonth() / 3);
+  const qStart = new Date(today.getFullYear(), q * 3, 1);
+  const qEnd = new Date(today.getFullYear(), q * 3 + 3, 0);
+  const allowedStart = addDays(qStart, 14);
+  const allowedEnd = addDays(qEnd, -14);
   let n = 0;
   for (const [sid, people] of bySub.entries()) {
     if (people.length === 0) continue;
     const admin = people.find((p) => p.company_admin) || people[0];
-    for (let i = 0; i < Math.min(people.length, 12); i += 1) {
-      const emp = people[i];
-      const start = addDays(today, -10 + i * 3);
-      const end = addDays(start, 1 + (i % 4));
-      const status = ['approved', 'approved', 'pending', 'declined'][i % 4];
-      await local.query(
-        `INSERT INTO public.workspace_leave_requests
-           (subsidiary_id, employee_id, leave_type, start_date, end_date, status, note, decided_by, decided_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          sid,
-          emp.id,
-          pick(LEAVE_TYPES, i),
-          iso(start),
-          iso(end),
-          status,
-          pick(LEAVE_NOTES, i),
-          status === 'pending' ? null : admin.id,
-          status === 'pending' ? null : addDays(start, -1).toISOString(),
-        ],
-      );
-      n += 1;
+    const byDept = new Map();
+    for (const emp of people) {
+      const key = String(emp.department || 'Unassigned').trim().toLowerCase() || 'unassigned';
+      const list = byDept.get(key) || [];
+      list.push(emp);
+      byDept.set(key, list);
+    }
+
+    let deptOffset = 0;
+    for (const members of byDept.values()) {
+      for (let i = 0; i < Math.min(members.length, 4); i += 1) {
+        const emp = members[i];
+        const mgr = emp.ghc_manager_id || emp.manager_id || admin.id;
+        let start = addDays(allowedStart, deptOffset * 5 + i * 12);
+        if (start > allowedEnd) start = allowedStart;
+        let end = addDays(start, 4);
+        if (end > allowedEnd) end = allowedEnd;
+        let status;
+        if (i === 0) status = 'approved';
+        else if (i === 1) status = 'pending';
+        else if (i === 2) status = 'manager_approved';
+        else status = 'declined';
+        await local.query(
+          `INSERT INTO public.workspace_leave_requests
+             (subsidiary_id, employee_id, leave_type, start_date, end_date, status, note, manager_id, decided_by, decided_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            sid,
+            emp.id,
+            pick(LEAVE_TYPES, i + deptOffset),
+            iso(start),
+            iso(end),
+            status,
+            pick(LEAVE_NOTES, i + deptOffset),
+            mgr,
+            status === 'pending' || status === 'manager_approved' ? null : admin.id,
+            status === 'pending' || status === 'manager_approved' ? null : addDays(start, -1).toISOString(),
+          ],
+        );
+        n += 1;
+      }
+      deptOffset += 1;
     }
   }
   console.log(`  leave requests: ${n}`);

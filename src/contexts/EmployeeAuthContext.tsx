@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
-import { resolveTenantFromHostname } from '@/tenants/config';
+import { getTenantBySlug, resolveTenantFromHostname } from '@/tenants/config';
+import { companyOrigin, lookupTenantSlugForEmail } from '@/tenants/companyHome';
 
 interface Profile {
   id: string;
@@ -12,6 +13,7 @@ interface Profile {
   department: string | null;
   subsidiary_id: string | null;
   hierarchy_level: number | null;
+  avatar_url: string | null;
   profile_completed: boolean | null;
   profile_completed_at: string | null;
   profile_confirmed_at: string | null;
@@ -257,14 +259,17 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    // Come back to the host the request was made from, and carry the tenant slug
-    // so hosts that do not identify a tenant on their own (localhost, preview
-    // URLs) still land on the right branding after Supabase redirects.
-    const tenant = resolveTenantFromHostname(window.location.hostname, window.location.search, {
-      lockedTenantSlug,
-    });
+    // Recovery links must land on the person's company host so the token matches
+    // that host's allowlist, and so the email hook can brand from redirect_to.
+    const fromRoster = await lookupTenantSlugForEmail(email);
+    const tenant =
+      getTenantBySlug(fromRoster) ??
+      resolveTenantFromHostname(window.location.hostname, window.location.search, {
+        lockedTenantSlug: fromRoster ?? lockedTenantSlug,
+      });
+    const origin = companyOrigin(tenant.slug);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password?tenant=${tenant.slug}`,
+      redirectTo: `${origin}/reset-password?tenant=${tenant.slug}`,
     });
     return { error: error?.message ?? null };
   };

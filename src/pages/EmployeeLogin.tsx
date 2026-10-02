@@ -8,16 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
-import { isGhcTenant, isGhcStyleAppraisal } from '@/tenants/config';
+import {
+  companyWorkspaceUrl,
+  lookupSignedInCompanySlug,
+  lookupTenantSlugForEmail,
+} from '@/tenants/companyHome';
 
 export default function EmployeeLogin() {
   const { tenant } = useTenant();
   const brand = getTenantBrandAssets(tenant);
-  const ghc = isGhcTenant(tenant);
-  const brandedLogin = isGhcStyleAppraisal(tenant);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -43,23 +44,14 @@ export default function EmployeeLogin() {
   const resolveAfterLogin = async (loginEmail: string) => {
     try {
       const url = new URL(afterLoginBase, window.location.origin);
-      const normalized = loginEmail.trim().toLowerCase();
-      const { data: lockRow } = await supabase
-        .from('employees')
-        .select('locked_tenant_slug')
-        .ilike('email', normalized)
-        .maybeSingle();
-      const locked = (lockRow as { locked_tenant_slug?: string | null } | null)?.locked_tenant_slug?.trim().toLowerCase();
-      if (locked) {
-        url.searchParams.set('tenant', locked);
-        return `${url.pathname}${url.search}`;
+      const slug =
+        (await lookupSignedInCompanySlug()) ||
+        (await lookupTenantSlugForEmail(loginEmail));
+      if (slug) {
+        url.searchParams.set('tenant', slug);
+        return companyWorkspaceUrl(slug, `${url.pathname}${url.search}`);
       }
-      const isGhcEmail =
-        normalized.endsWith('@greenhouse.capital') ||
-        normalized.endsWith('@greenhousecapital.com');
-      if ((ghc || isGhcEmail) && !url.searchParams.get('tenant')) {
-        url.searchParams.set('tenant', 'ghc');
-      } else if (isGhcStyleAppraisal(tenant) && !url.searchParams.get('tenant')) {
+      if (!url.searchParams.get('tenant')) {
         url.searchParams.set('tenant', tenant.slug);
       }
       return `${url.pathname}${url.search}`;
@@ -126,19 +118,22 @@ export default function EmployeeLogin() {
             <div className="mobile-flow-content px-0 py-2 sm:px-0 lg:overflow-visible lg:px-0 lg:py-0">
               {brand.logoStyle === 'lockup' ? (
                 <div className="mb-6 flex items-center gap-3 sm:mb-8">
-                  <img src={brand.logoMark} alt={brand.logoAlt} className={brand.logoClassName} />
-                  <span className="font-display text-xl font-semibold tracking-[-0.01em]">
+                  <img src={brand.logoMark} alt="" className="h-11 w-11 shrink-0 rounded-md object-contain" />
+                  <span className="font-display text-2xl font-semibold tracking-[-0.02em]">
                     {brand.wordmark}
                   </span>
                 </div>
+              ) : brand.logoStyle === 'banner' ? (
+                <img
+                  src={brand.logo}
+                  alt={brand.logoAlt}
+                  className="mb-6 h-16 w-auto max-w-full object-contain object-left sm:mb-8 sm:h-[4.5rem]"
+                />
               ) : (
                 <img
-                  src={brand.logoStyle === 'banner' ? brand.logo : brand.logoMark}
+                  src={brand.logo}
                   alt={brand.logoAlt}
-                  className={cn(
-                    'mb-6 sm:mb-8',
-                    brand.logoStyle === 'banner' ? brand.logoClassName : brand.logoMarkClassName,
-                  )}
+                  className="mb-6 h-10 w-auto object-contain sm:mb-8 sm:h-12"
                 />
               )}
               {brand.parentCredit ? (
@@ -146,14 +141,11 @@ export default function EmployeeLogin() {
               ) : null}
 
               <div className="mb-6 sm:mb-8">
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-foreground/60">
-                  {brandedLogin ? tenant.branding.fullName : 'Employee'}
-                </span>
-                <h1 className="mt-2.5 font-serif text-[1.65rem] font-semibold leading-[1.0] tracking-[-0.02em] sm:text-[2.35rem] sm:leading-[0.98]">
+                <h1 className="font-serif text-[1.65rem] font-semibold leading-[1.0] tracking-[-0.02em] sm:text-[2.35rem] sm:leading-[0.98]">
                   Welcome back.
                 </h1>
-                <p className="mt-2 text-[13px] text-foreground/60 sm:text-sm leading-relaxed">
-                  {tenant.branding.workspaceLabel} — after sign-in you&apos;ll open your appraisal hub with tasks, dashboard, and growth tools based on your role. Secure employee access only.
+                <p className="mt-2 text-[13px] leading-relaxed text-foreground/60 sm:text-sm">
+                  Sign in with your work email.
                 </p>
               </div>
 
@@ -243,18 +235,12 @@ export default function EmployeeLogin() {
                 </div>
               </form>
 
-              <div className="mt-5 flex flex-col gap-1.5 border-t border-foreground/10 px-1 pt-4 sm:mt-7 sm:flex-row sm:items-center sm:justify-between lg:mt-9">
+              <div className="mt-5 border-t border-foreground/10 px-1 pt-4 sm:mt-7 lg:mt-9">
                 <Link
                   to={findAccountLink()}
                   className="inline-flex min-h-10 items-center font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70 hover:text-foreground"
                 >
                   First time? → Find your account
-                </Link>
-                <Link
-                  to="/admin"
-                  className="inline-flex min-h-10 items-center font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/50 hover:text-foreground"
-                >
-                  Admin sign-in →
                 </Link>
               </div>
             </div>

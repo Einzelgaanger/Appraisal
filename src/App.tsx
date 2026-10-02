@@ -26,6 +26,7 @@ import TenantSubsidiaryBridge from "@/tenants/TenantSubsidiaryBridge";
 import TenantLockEnforcer from "@/tenants/TenantLockEnforcer";
 import LocalDevBanner from "@/components/LocalDevBanner";
 import { isApexHostname, isTenantSubdomainHost } from "@/tenants/config";
+import { companyWorkspaceUrl } from "@/tenants/companyHome";
 
 const queryClient = new QueryClient();
 
@@ -55,13 +56,25 @@ function ProtectedEmployeeRoute({
   return <ProfileCompletionGate>{children}</ProfileCompletionGate>;
 }
 
+function companyPath(slug: string | null | undefined, pathWithSearch: string) {
+  if (!slug || typeof window === 'undefined') return pathWithSearch;
+  const dest = new URL(companyWorkspaceUrl(slug, pathWithSearch));
+  if (dest.origin !== window.location.origin) {
+    window.location.replace(dest.href);
+    return null;
+  }
+  return `${dest.pathname}${dest.search}`;
+}
+
 function EmployeeLoginRedirect() {
   const location = useLocation();
-  const { isLoading } = useEmployeeAuth();
+  const { isLoading, lockedTenantSlug } = useEmployeeAuth();
   if (isLoading) return <AppBootstrapSkeleton />;
   const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
   const target = from ? `${from.pathname}${from.search ?? ''}` : '/hub?tab=survey';
-  return <Navigate to={target} replace />;
+  const next = companyPath(lockedTenantSlug, target);
+  if (next === null) return <AppBootstrapSkeleton />;
+  return <Navigate to={next} replace />;
 }
 
 function AdminGate() {
@@ -76,9 +89,13 @@ function AdminGate() {
 }
 
 function HomeRoute() {
-  const { isAuthenticated: isEmployee, isLoading } = useEmployeeAuth();
+  const { isAuthenticated: isEmployee, isLoading, lockedTenantSlug } = useEmployeeAuth();
   if (isLoading) return <AppBootstrapSkeleton />;
-  if (isEmployee) return <Navigate to="/hub?tab=survey" replace />;
+  if (isEmployee) {
+    const next = companyPath(lockedTenantSlug, '/hub?tab=survey');
+    if (next === null) return <AppBootstrapSkeleton />;
+    return <Navigate to={next} replace />;
+  }
 
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();

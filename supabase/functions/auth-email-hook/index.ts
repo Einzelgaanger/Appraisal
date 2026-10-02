@@ -9,6 +9,14 @@ import { MagicLinkEmail } from '../_shared/email-templates/magic-link.tsx'
 import { RecoveryEmail } from '../_shared/email-templates/recovery.tsx'
 import { EmailChangeEmail } from '../_shared/email-templates/email-change.tsx'
 import { ReauthenticationEmail } from '../_shared/email-templates/reauthentication.tsx'
+import {
+  EMAIL_BRANDS,
+  brandFromSlug,
+  emailSubject,
+  fromHeader,
+  slugFromConfirmationUrl,
+  type EmailBrand,
+} from '../_shared/email-templates/email-brand.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,16 +24,6 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-lovable-signature, x-lovable-timestamp, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
-const EMAIL_SUBJECTS: Record<string, string> = {
-  signup: 'VGG 360° Appraisal — Confirm Your Email',
-  invite: "VGG 360° Appraisal — You've Been Invited",
-  magiclink: 'VGG 360° Appraisal — Your Secure Login Link',
-  recovery: 'VGG 360° Appraisal — Reset Your Password',
-  email_change: 'VGG 360° Appraisal — Confirm Email Change',
-  reauthentication: 'VGG 360° Appraisal — Verification Code',
-}
-
-// Template mapping
 const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
   signup: SignupEmail,
   invite: InviteEmail,
@@ -35,43 +33,34 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
   reauthentication: ReauthenticationEmail,
 }
 
-// Configuration
-const SITE_NAME = "VGG 360° Appraisal"
-const SENDER_DOMAIN = "notify.vgg.tools"
-const ROOT_DOMAIN = "vgg.tools"
-const FROM_DOMAIN = "vgg.tools"
+const SENDER_DOMAIN = 'notify.vgg.tools'
+const FROM_DOMAIN = 'vgg.tools'
 
-const SAMPLE_PROJECT_URL = "https://vgg360appraisal.lovable.app"
-const SAMPLE_EMAIL = "user@example.test"
-const SAMPLE_DATA: Record<string, object> = {
-  signup: {
-    siteName: SITE_NAME,
-    siteUrl: SAMPLE_PROJECT_URL,
-    recipient: SAMPLE_EMAIL,
-    confirmationUrl: SAMPLE_PROJECT_URL,
-  },
-  magiclink: {
-    siteName: SITE_NAME,
-    confirmationUrl: SAMPLE_PROJECT_URL,
-  },
-  recovery: {
-    siteName: SITE_NAME,
-    confirmationUrl: SAMPLE_PROJECT_URL,
-  },
-  invite: {
-    siteName: SITE_NAME,
-    siteUrl: SAMPLE_PROJECT_URL,
-    confirmationUrl: SAMPLE_PROJECT_URL,
-  },
-  email_change: {
-    siteName: SITE_NAME,
-    email: SAMPLE_EMAIL,
-    newEmail: SAMPLE_EMAIL,
-    confirmationUrl: SAMPLE_PROJECT_URL,
-  },
-  reauthentication: {
+function sampleProps(brand: EmailBrand): Record<string, unknown> {
+  const confirmationUrl = `${brand.siteUrl}/reset-password?tenant=${brand.slug}`
+  const shared = {
+    brand,
+    siteName: brand.siteName,
+    siteUrl: brand.siteUrl,
+    recipient: 'user@example.test',
+    confirmationUrl,
+    email: 'user@example.test',
+    newEmail: 'new@example.test',
     token: '123456',
-  },
+  }
+  return shared
+}
+
+async function resolveBrand(
+  supabase: ReturnType<typeof createClient>,
+  email: string | undefined,
+  confirmationUrl: string | undefined,
+): Promise<EmailBrand> {
+  if (email) {
+    const { data } = await supabase.rpc('tenant_slug_for_email', { _email: email })
+    if (typeof data === 'string' && data.trim()) return brandFromSlug(data)
+  }
+  return brandFromSlug(slugFromConfirmationUrl(confirmationUrl))
 }
 
 // Preview endpoint handler - returns rendered HTML without sending email
@@ -115,8 +104,9 @@ async function handlePreview(req: Request): Promise<Response> {
     })
   }
 
-  const sampleData = SAMPLE_DATA[type] || {}
-  const html = await renderAsync(React.createElement(EmailTemplate, sampleData))
+  const previewSlug = new URL(req.url).searchParams.get('tenant')
+  const brand = brandFromSlug(previewSlug) || EMAIL_BRANDS.executiveteam
+  const html = await renderAsync(React.createElement(EmailTemplate, sampleProps(brand)))
 
   return new Response(html, {
     status: 200,
@@ -212,10 +202,16 @@ async function handleWebhook(req: Request): Promise<Response> {
     )
   }
 
-  // Build template props from payload.data (HookData structure)
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const brand = await resolveBrand(supabase, payload.data.email, payload.data.url)
   const templateProps = {
-    siteName: SITE_NAME,
-    siteUrl: `https://${ROOT_DOMAIN}`,
+    brand,
+    siteName: brand.siteName,
+    siteUrl: brand.siteUrl,
     recipient: payload.data.email,
     confirmationUrl: payload.data.url,
     token: payload.data.token,
@@ -223,17 +219,10 @@ async function handleWebhook(req: Request): Promise<Response> {
     newEmail: payload.data.new_email,
   }
 
-  // Render React Email to HTML and plain text
   const html = await renderAsync(React.createElement(EmailTemplate, templateProps))
   const text = await renderAsync(React.createElement(EmailTemplate, templateProps), {
     plainText: true,
   })
-
-  // Enqueue email for async processing by the dispatcher (process-email-queue).
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
 
   const messageId = crypto.randomUUID()
 
@@ -251,9 +240,9 @@ async function handleWebhook(req: Request): Promise<Response> {
       run_id,
       message_id: messageId,
       to: payload.data.email,
-      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+      from: fromHeader(brand, FROM_DOMAIN),
       sender_domain: SENDER_DOMAIN,
-      subject: EMAIL_SUBJECTS[emailType] || 'Notification',
+      subject: emailSubject(brand, emailType),
       html,
       text,
       purpose: 'transactional',

@@ -366,12 +366,20 @@
 
   .workspace-portal-hero-strip::after {
     content: '';
-    @apply absolute inset-0;
+    @apply pointer-events-none absolute inset-0 z-[2];
     background: linear-gradient(
       180deg,
       hsl(var(--portal-accent) / 0.25) 0%,
       hsl(var(--paper-deep) / 0.92) 100%
     );
+  }
+
+  .workspace-portal-gallery {
+    @apply absolute inset-0;
+  }
+
+  .workspace-portal-gallery img {
+    @apply absolute inset-0 h-full w-full object-cover;
   }
 
   .workspace-portal-editorial-panel {
@@ -388,7 +396,7 @@
 
   .workspace-portal-photo-frame::after {
     content: '';
-    @apply absolute inset-0;
+    @apply pointer-events-none absolute inset-0 z-[2];
     background: linear-gradient(
       to top,
       hsl(var(--paper-deep) / 0.95) 0%,

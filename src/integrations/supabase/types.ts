@@ -1126,6 +1126,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      my_companies: {
+        Args: never
+        Returns: {
+          company_name: string | null
+          employee_id: string
+          employee_role: string | null
+          is_active: boolean
+          tenant_slug: string | null
+        }[]
+      }
+      tenant_slug_for_email: {
+        Args: { _email: string }
+        Returns: string
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
