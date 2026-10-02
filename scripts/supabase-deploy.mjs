@@ -140,6 +140,10 @@ if (runSecrets) {
   if (anon) secretPairs.push(`SUPABASE_ANON_KEY=${anon}`);
   add('LOVABLE_API_KEY');
   add('LOVABLE_SEND_URL');
+  add('RESEND_API_KEY');
+  add('RESEND_FROM_DOMAIN');
+  add('RESEND_FROM_EMAIL');
+  add('SEND_EMAIL_HOOK_SECRET');
   add('CLAUDE_API_KEY');
   add('CLAUDE_MODEL');
   add('PERPLEXITY_API_KEY');
