@@ -25,6 +25,7 @@ import {
   lockObjectives,
   saveKeyResult,
   saveObjective,
+  linkTaskToProject,
   setProjectKeyResult,
   type PlannerBoard,
   type PlannerObjective,
@@ -49,9 +50,9 @@ const PRIORITY_LABEL: Record<string, string> = {
   critical: 'Critical',
 };
 
-type Filter = { due: string; status: string; priority: string; person: string };
+type Filter = { due: string; status: string; priority: string; person: string; next: string; parent: string };
 
-const EMPTY_FILTER: Filter = { due: 'any', status: 'any', priority: 'any', person: 'any' };
+const EMPTY_FILTER: Filter = { due: 'any', status: 'any', priority: 'any', person: 'any', next: 'any', parent: 'any' };
 
 function thisWeek(iso: string | null) {
   if (!iso) return false;
@@ -71,11 +72,37 @@ function dueText(iso: string | null) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function matches(row: { due_date: string | null; status: string; priority: string; person?: string }, filter: Filter) {
+function dayStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isToday(iso: string | null) {
+  if (!iso) return false;
+  const date = new Date(`${iso}T12:00:00`);
+  const today = dayStart(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  return date >= today && date < tomorrow;
+}
+
+function isOverdue(iso: string | null, status: string) {
+  if (!iso || status === 'done' || status === 'cancelled') return false;
+  return new Date(`${iso}T12:00:00`) < dayStart(new Date());
+}
+
+function matches(
+  row: { due_date: string | null; status: string; priority: string; person?: string; next_action?: string | null; links?: string[] },
+  filter: Filter,
+) {
+  if (filter.due === 'today' && !isToday(row.due_date)) return false;
   if (filter.due === 'week' && !thisWeek(row.due_date)) return false;
+  if (filter.due === 'overdue' && !isOverdue(row.due_date, row.status)) return false;
+  if (filter.due === 'open' && (row.status === 'done' || row.status === 'cancelled')) return false;
   if (filter.status !== 'any' && row.status !== filter.status) return false;
   if (filter.priority !== 'any' && row.priority !== filter.priority) return false;
   if (filter.person !== 'any' && row.person !== filter.person) return false;
+  if (filter.next === 'set' && !row.next_action?.trim()) return false;
+  if (filter.parent !== 'any' && !(row.links ?? []).includes(filter.parent)) return false;
   return true;
 }
 
@@ -88,6 +115,7 @@ function Section({
   filter,
   onFilter,
   people,
+  parents,
   children,
 }: {
   title: string;
@@ -98,6 +126,7 @@ function Section({
   filter: Filter;
   onFilter: (next: Filter) => void;
   people: string[];
+  parents?: string[];
   children: React.ReactNode;
 }) {
   return (
@@ -113,13 +142,17 @@ function Section({
       {open && (
         <div className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
           <div className="flex flex-wrap gap-2">
-            <FilterSelect label="Due" value={filter.due} onChange={(due) => onFilter({ ...filter, due })} options={[['any', 'Any date'], ['week', 'Due this week']]} />
+            <FilterSelect label="Due" value={filter.due} onChange={(due) => onFilter({ ...filter, due })} options={[['any', 'Any date'], ['today', 'Due today'], ['week', 'Due this week'], ['overdue', 'Overdue'], ['open', 'Still open']]} />
             <FilterSelect label="Status" value={filter.status} onChange={(status) => onFilter({ ...filter, status })} options={[['any', 'Any status'], ...Object.entries(STATUS_LABEL)]} />
             <FilterSelect label="Priority" value={filter.priority} onChange={(priority) => onFilter({ ...filter, priority })} options={[['any', 'Any priority'], ...Object.entries(PRIORITY_LABEL)]} />
             {people.length > 0 && (
               <FilterSelect label="Person" value={filter.person} onChange={(person) => onFilter({ ...filter, person })} options={[['any', 'Anyone'], ...people.map((name) => [name, name] as [string, string])]} />
             )}
-            {(filter.due !== 'any' || filter.status !== 'any' || filter.priority !== 'any' || filter.person !== 'any') && (
+            <FilterSelect label="Next action" value={filter.next} onChange={(next) => onFilter({ ...filter, next })} options={[['any', 'Any'], ['set', 'Has a next action']]} />
+            {parents && parents.length > 0 && (
+              <FilterSelect label="Linked to" value={filter.parent} onChange={(parent) => onFilter({ ...filter, parent })} options={[['any', 'Any link'], ...parents.map((name) => [name, name] as [string, string])]} />
+            )}
+            {(filter.due !== 'any' || filter.status !== 'any' || filter.priority !== 'any' || filter.person !== 'any' || filter.next !== 'any' || filter.parent !== 'any') && (
               <Button variant="ghost" size="sm" onClick={() => onFilter(EMPTY_FILTER)}>Clear</Button>
             )}
           </div>
@@ -252,22 +285,27 @@ export default function PlannerLadder({
   if (!board) return null;
 
   const companyRows = board.company_objectives.filter((row) => matches(row, filters.company));
-  const unitRows = board.unit_objectives.filter((row) => matches(row, filters.unit));
-  const krRows = board.key_results.filter((row) => matches({ ...row, person: row.owner_name }, filters.kr));
+  const unitRows = board.unit_objectives.filter((row) => matches({ ...row, links: row.parent_title ? [row.parent_title] : [] }, filters.unit));
+  const krRows = board.key_results.filter((row) => matches({ ...row, person: row.owner_name, links: row.parent_title ? [row.parent_title] : [] }, filters.kr));
   const projectRows = projects.filter((row) => matches({
     due_date: row.due_date,
     status: (row.progress_pct ?? 0) >= 100 ? 'done' : (row.progress_pct ?? 0) > 0 ? 'in_progress' : 'not_started',
     priority: 'medium',
     person: row.owner_name ?? '',
   }, filters.projects));
-  const taskRows = board.tasks.filter((row) => matches({ ...row, person: row.assignee_name }, filters.tasks));
+  const taskRows = board.tasks.filter((row) => matches({
+    ...row,
+    person: row.assignee_name,
+    links: [row.project_name, row.key_result_title, ...(row.also_on ?? [])].filter((name): name is string => Boolean(name)),
+  }, filters.tasks));
+  const taskLinks = [...new Set(board.tasks.flatMap((row) => [row.project_name, row.key_result_title, ...(row.also_on ?? [])].filter((name): name is string => Boolean(name))))].sort();
   const canEditObjectives = board.can_manage_objectives && (!board.objectives_locked || board.is_leadership);
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {board.period}. Completion rolls up from tasks to projects, key results, and objectives. A key result can sit on a unit objective, or directly on a company objective.
+          {board.period}. Completion rolls up from tasks to projects, key results, and objectives. Critical work counts more than low-priority work. A key result can sit on a unit objective, or directly on a company objective. A task can also count on a second project.
         </p>
         {board.is_leadership && (
           <Button
@@ -445,8 +483,17 @@ export default function PlannerLadder({
         filter={filters.tasks}
         onFilter={(next) => setFilters((prev) => ({ ...prev, tasks: next }))}
         people={people}
+        parents={taskLinks}
       >
-        <TaskTable rows={taskRows} onOpenProject={onOpenProject} />
+        <TaskTable
+          rows={taskRows}
+          projects={projects}
+          onOpenProject={onOpenProject}
+          onLink={async (taskId, projectId) => {
+            await linkTaskToProject(taskId, projectId);
+            await load();
+          }}
+        />
       </Section>
 
       <Dialog open={editor !== null} onOpenChange={(next) => { if (!next) setEditor(null); }}>
@@ -564,7 +611,17 @@ function ObjectiveTable({
   );
 }
 
-function TaskTable({ rows, onOpenProject }: { rows: PlannerTaskRow[]; onOpenProject: (id: string) => void }) {
+function TaskTable({
+  rows,
+  projects,
+  onOpenProject,
+  onLink,
+}: {
+  rows: PlannerTaskRow[];
+  projects: WorkspaceProjectListItem[];
+  onOpenProject: (id: string) => void;
+  onLink: (taskId: string, projectId: string) => Promise<void>;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[860px] text-sm">
@@ -589,6 +646,17 @@ function TaskTable({ rows, onOpenProject }: { rows: PlannerTaskRow[]; onOpenProj
               <td className="py-2.5 pr-3">{dueText(row.due_date)}</td>
               <td className="py-2.5 pr-3">
                 <button type="button" className="text-primary" onClick={() => onOpenProject(row.project_id)}>{row.project_name}</button>
+                {row.also_on.length > 0 && <p className="text-xs text-muted-foreground">Also on {row.also_on.join(', ')}</p>}
+                {projects.some((project) => project.id !== row.project_id) && (
+                  <Select onValueChange={(projectId) => void onLink(row.id, projectId).catch((error) => toast.error(error instanceof Error ? error.message : 'Could not add this task'))}>
+                    <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Add to another project" /></SelectTrigger>
+                    <SelectContent>
+                      {projects.filter((project) => project.id !== row.project_id && !row.also_on.includes(project.name)).map((project) => (
+                        <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </td>
               <td className="py-2.5 pr-3">{row.key_result_title ?? '—'}</td>
               <td className="py-2.5 pr-3">{row.assignee_name}</td>

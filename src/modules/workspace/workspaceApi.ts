@@ -295,6 +295,7 @@ export type PlannerTaskRow = {
   title: string;
   project_id: string;
   project_name: string;
+  also_on: string[];
   key_result_title: string | null;
   assignee_name: string;
   due_date: string | null;
@@ -328,8 +329,16 @@ export async function getPlanner(): Promise<PlannerBoard> {
     unit_objectives: row.unit_objectives ?? [],
     key_results: row.key_results ?? [],
     project_links: row.project_links ?? [],
-    tasks: row.tasks ?? [],
+    tasks: (row.tasks ?? []).map((task) => ({ ...task, also_on: task.also_on ?? [] })),
   };
+}
+
+export async function linkTaskToProject(taskId: string, projectId: string): Promise<void> {
+  const { error } = await db.rpc('workspace_link_task_project', {
+    _task_id: taskId,
+    _project_id: projectId,
+  });
+  if (error) rpcError(error);
 }
 
 export async function saveObjective(payload: {

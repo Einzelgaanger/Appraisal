@@ -19,7 +19,7 @@ interface MobileTabBarProps {
 }
 
 const PRIMARY: { key: MobileTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: 'survey', label: 'Appraisal', icon: ClipboardList },
+  { key: 'survey', label: 'Appraiser', icon: ClipboardList },
   { key: 'projects', label: 'Planner', icon: FolderKanban },
   { key: 'leave', label: 'Leave', icon: CalendarRange },
 ];

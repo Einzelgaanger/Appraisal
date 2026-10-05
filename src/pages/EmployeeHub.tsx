@@ -1009,7 +1009,7 @@ export default function EmployeeHub() {
         items={[
           {
             key: 'appraisal-group',
-            label: 'Appraisal',
+            label: 'Appraiser',
             icon: <ClipboardList className="w-4 h-4" />,
             children: [
               { key: 'survey', label: 'Reviews', icon: <ClipboardList className="w-4 h-4" />, active: activeTab === 'survey', onClick: () => setTab('survey') },
@@ -1072,7 +1072,7 @@ export default function EmployeeHub() {
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 rounded-md object-contain" />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
-              ◉ {activeTab === 'survey' ? 'Appraisal'
+              ◉ {activeTab === 'survey' ? 'Appraiser'
                   : activeTab === 'dashboard' ? 'My Dashboard'
                   : activeTab === 'growth' && showGrowthHub ? 'Growth Hub'
                   : activeTab === 'rankings' ? 'Rankings'
