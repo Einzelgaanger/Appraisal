@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import PlannerLadder from '@/modules/workspace/PlannerLadder';
 import {
   companyDirectory,
   createProject,
@@ -349,10 +350,10 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
     <div className="space-y-8">
       <div className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl">
-          <p className="eyebrow-primary">Projects</p>
-          <h2 className="font-display mt-3 text-[1.75rem] font-medium tracking-tight">Company register</h2>
+          <p className="eyebrow-primary">Planner</p>
+          <h2 className="font-display mt-3 text-[1.75rem] font-medium tracking-tight">Company objectives to tasks</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Work is entered by hand. Each record shows completion, what remains, and which of that work is crucial. Members, their line manager, and company leadership may open it.
+            Work is entered by hand. Completion rolls upward. Members, their line manager, and company leadership can open a project.
           </p>
         </div>
         <Button className="shrink-0 gap-2" onClick={() => setCreateOpen(true)}>
@@ -378,6 +379,8 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
           </div>
         </section>
       )}
+
+      <PlannerLadder projects={myProjects} directory={directory} onOpenProject={onOpenProject} />
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">

@@ -1035,7 +1035,7 @@ export default function EmployeeHub() {
                 : []),
             ],
           },
-          { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, active: activeTab === 'projects', onClick: () => setTab('projects') },
+          { key: 'projects', label: 'Planner', icon: <FolderKanban className="w-4 h-4" />, active: activeTab === 'projects', onClick: () => setTab('projects') },
           { key: 'leave', label: 'Leave planner', icon: <CalendarRange className="w-4 h-4" />, active: activeTab === 'leave', onClick: () => setTab('leave') },
           { key: 'profile', label: 'My profile', icon: <User className="w-4 h-4" />, active: activeTab === 'profile', onClick: () => setTab('profile') },
         ]}

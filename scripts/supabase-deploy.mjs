@@ -61,7 +61,8 @@ function runSupabase(subArgs, opts = {}) {
 }
 
 function run(cmd, cmdArgs, opts = {}) {
-  console.log(`\n> ${cmd} ${cmdArgs.join(' ')}`);
+  const shown = cmdArgs.map((arg, index) => (cmdArgs[index - 1] === '-p' ? '***' : arg));
+  console.log(`\n> ${cmd} ${shown.join(' ')}`);
   const result = spawnSync(cmd, cmdArgs, {
     cwd: root,
     stdio: 'inherit',

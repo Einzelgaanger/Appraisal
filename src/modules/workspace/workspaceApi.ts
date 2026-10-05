@@ -257,6 +257,148 @@ export async function delegateTask(taskId: string, toEmployeeId: string, note?: 
   if (error) rpcError(error);
 }
 
+export type PlannerStatus = 'not_started' | 'in_progress' | 'done' | 'blocked' | 'cancelled';
+export type PlannerPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export type PlannerObjective = {
+  id: string;
+  parent_id?: string | null;
+  parent_title?: string | null;
+  title: string;
+  priority: PlannerPriority;
+  status: PlannerStatus;
+  due_date: string | null;
+  locked: boolean;
+  progress_pct: number;
+  child_count: number;
+};
+
+export type PlannerKeyResult = {
+  id: string;
+  title: string;
+  owner_id: string;
+  owner_name: string;
+  company_objective_id: string | null;
+  unit_objective_id: string | null;
+  parent_title: string | null;
+  priority: PlannerPriority;
+  status: PlannerStatus;
+  due_date: string | null;
+  progress_pct: number;
+  project_count: number;
+  task_count: number;
+  can_edit: boolean;
+};
+
+export type PlannerTaskRow = {
+  id: string;
+  title: string;
+  project_id: string;
+  project_name: string;
+  key_result_title: string | null;
+  assignee_name: string;
+  due_date: string | null;
+  priority: PlannerPriority;
+  status: PlannerStatus;
+  next_action: string | null;
+};
+
+export type PlannerBoard = {
+  period: string;
+  can_manage_objectives: boolean;
+  is_leadership: boolean;
+  objectives_locked: boolean;
+  company_objectives: PlannerObjective[];
+  unit_objectives: PlannerObjective[];
+  key_results: PlannerKeyResult[];
+  project_links: { id: string; key_result_id: string | null }[];
+  tasks: PlannerTaskRow[];
+};
+
+export async function getPlanner(): Promise<PlannerBoard> {
+  const { data, error } = await db.rpc('workspace_get_planner');
+  if (error) rpcError(error);
+  const row = (data ?? {}) as PlannerBoard;
+  return {
+    period: row.period,
+    can_manage_objectives: Boolean(row.can_manage_objectives),
+    is_leadership: Boolean(row.is_leadership),
+    objectives_locked: Boolean(row.objectives_locked),
+    company_objectives: row.company_objectives ?? [],
+    unit_objectives: row.unit_objectives ?? [],
+    key_results: row.key_results ?? [],
+    project_links: row.project_links ?? [],
+    tasks: row.tasks ?? [],
+  };
+}
+
+export async function saveObjective(payload: {
+  id?: string | null;
+  level: 'company' | 'unit';
+  parentId?: string | null;
+  title: string;
+  priority: string;
+  status: string;
+  dueDate?: string | null;
+}): Promise<void> {
+  const { error } = await db.rpc('workspace_save_objective', {
+    _id: payload.id ?? null,
+    _level: payload.level,
+    _parent_id: payload.parentId ?? null,
+    _title: payload.title,
+    _priority: payload.priority,
+    _status: payload.status,
+    _due_date: payload.dueDate || null,
+  });
+  if (error) rpcError(error);
+}
+
+export async function deleteObjective(id: string): Promise<void> {
+  const { error } = await db.rpc('workspace_delete_objective', { _id: id });
+  if (error) rpcError(error);
+}
+
+export async function lockObjectives(locked: boolean): Promise<void> {
+  const { error } = await db.rpc('workspace_lock_objectives', { _locked: locked });
+  if (error) rpcError(error);
+}
+
+export async function saveKeyResult(payload: {
+  id?: string | null;
+  title: string;
+  companyObjectiveId?: string | null;
+  unitObjectiveId?: string | null;
+  priority: string;
+  status: string;
+  dueDate?: string | null;
+  ownerId?: string | null;
+}): Promise<void> {
+  const { error } = await db.rpc('workspace_save_key_result', {
+    _id: payload.id ?? null,
+    _title: payload.title,
+    _company_objective_id: payload.companyObjectiveId ?? null,
+    _unit_objective_id: payload.unitObjectiveId ?? null,
+    _priority: payload.priority,
+    _status: payload.status,
+    _due_date: payload.dueDate || null,
+    _owner_id: payload.ownerId ?? null,
+  });
+  if (error) rpcError(error);
+}
+
+export async function deleteKeyResult(id: string): Promise<void> {
+  const { error } = await db.rpc('workspace_delete_key_result', { _id: id });
+  if (error) rpcError(error);
+}
+
+export async function setProjectKeyResult(projectId: string, keyResultId: string | null): Promise<void> {
+  const { error } = await db.rpc('workspace_set_project_key_result', {
+    _project_id: projectId,
+    _key_result_id: keyResultId,
+  });
+  if (error) rpcError(error);
+}
+
 export async function respondDelegation(delegationId: string, accept: boolean): Promise<void> {
   const { error } = await db.rpc('workspace_respond_delegation', {
     _delegation_id: delegationId,
