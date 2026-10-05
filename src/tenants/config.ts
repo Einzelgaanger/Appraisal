@@ -150,6 +150,16 @@ function extractSubdomain(hostname: string): string {
   return parts[0] ?? normalized;
 }
 
+/** The company this browser location is asking for, before any saved company is applied. */
+export function tenantSlugFromLocation(hostname: string, search: string): string | null {
+  const host = hostname.toLowerCase().split(':')[0];
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const fromQuery = params.get('tenant');
+  if (host === 'localhost' || host === '127.0.0.1') return fromQuery;
+  const fromHost = TENANTS.find((tenant) => tenant.subdomains.includes(extractSubdomain(host)));
+  return fromHost?.slug ?? fromQuery;
+}
+
 export function getTenantBySlug(slug: string | null | undefined): TenantConfig | undefined {
   if (!slug) return undefined;
   return TENANTS.find((tenant) => tenant.slug === slug.trim().toLowerCase());

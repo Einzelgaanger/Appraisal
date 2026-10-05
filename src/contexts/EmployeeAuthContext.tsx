@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
-import { getTenantBySlug, resolveTenantFromHostname } from '@/tenants/config';
+import { getTenantBySlug, resolveTenantFromHostname, tenantSlugFromLocation } from '@/tenants/config';
 import { companyOrigin, lookupTenantSlugForEmail } from '@/tenants/companyHome';
 
 interface Profile {
@@ -60,6 +60,34 @@ async function loadCompanyContext(employeeId: string | null | undefined) {
   }
 
   return { companies, companyAdmin, lock: active?.tenant_slug ?? staticLock };
+}
+
+function seatOnOpenedCompany(companies: Company[], personName: string | null | undefined): Company | null {
+  if (typeof window === 'undefined') return null;
+  const asked = tenantSlugFromLocation(window.location.hostname, window.location.search);
+  if (!asked) return null;
+  const seats = companies.filter((company) => company.tenant_slug === asked);
+  const ownName = personName?.trim().toLowerCase() ?? '';
+  const named = ownName
+    ? seats.find((company) => company.employee_name?.trim().toLowerCase() === ownName)
+    : null;
+  return named ?? (seats.length === 1 ? seats[0] : null);
+}
+
+/** Stay on the company site the person opened when they have a seat there. */
+async function alignOpenedCompany(
+  employeeId: string | null | undefined,
+  personName: string | null | undefined,
+  preferOpenedHost: boolean,
+) {
+  let context = await loadCompanyContext(employeeId);
+  if (!preferOpenedHost) return context;
+  const seat = seatOnOpenedCompany(context.companies, personName);
+  if (!seat || seat.is_active) return context;
+  const { error } = await db.rpc('set_active_company', { _employee_id: seat.employee_id });
+  if (error) return context;
+  context = await loadCompanyContext(employeeId);
+  return context;
 }
 
 interface EmployeeAuthContextType {
@@ -184,8 +212,10 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setProfile(resolvedProfile);
 
-      const { companies: myCompanies, companyAdmin, lock } = await loadCompanyContext(
+      const { companies: myCompanies, companyAdmin, lock } = await alignOpenedCompany(
         resolvedProfile?.employee_id,
+        resolvedProfile?.name,
+        true,
       );
 
       if (cancelled) return;
@@ -205,7 +235,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (preferOpenedHost = true) => {
     if (!user) return;
     setProfileLoading(true);
     const [{ data: profileData }, { data: roleData }] = await Promise.all([
@@ -215,8 +245,10 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     const nextProfile = profileData as Profile | null;
     setProfile(nextProfile);
 
-    const { companies: myCompanies, companyAdmin, lock } = await loadCompanyContext(
+    const { companies: myCompanies, companyAdmin, lock } = await alignOpenedCompany(
       nextProfile?.employee_id,
+      nextProfile?.name,
+      preferOpenedHost,
     );
     setCompanies(myCompanies);
     setIsCompanyAdmin(companyAdmin);
@@ -232,7 +264,7 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message as string };
     // Reloading rewrites lockedTenantSlug, which TenantLockEnforcer then follows to
     // the new company's host.
-    await refreshProfile();
+    await refreshProfile(false);
     return { error: null };
   };
 
