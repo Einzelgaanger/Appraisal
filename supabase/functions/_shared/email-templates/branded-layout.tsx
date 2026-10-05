@@ -10,7 +10,6 @@ import {
   Heading,
   Hr,
   Html,
-  Img,
   Preview,
   Section,
   Text,
@@ -42,16 +41,15 @@ export function BrandedEmailFrame({
       <Preview>{preview}</Preview>
       <Body style={styles.main}>
         <Container style={styles.outerContainer}>
-          <Section style={styles.headerSection}>
-            <Img
-              src={brand.logoUrl}
+          <Section style={styles.contentSection}>
+            <img
+              src="cid:company-logo"
               alt={brand.logoAlt}
               width={brand.logoWidth}
-              height="auto"
+              height={brand.logoHeight}
               style={styles.logo}
             />
-          </Section>
-          <Section style={styles.contentSection}>
+            <Hr style={styles.logoRule} />
             <Text style={styles.eyebrow}>{eyebrow}</Text>
             <Heading style={styles.h1}>{heading}</Heading>
             {children}
@@ -72,19 +70,20 @@ export function brandStyles(brand: EmailBrand) {
       fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     },
     outerContainer: { maxWidth: '600px', margin: '0 auto', padding: '28px 16px 40px' },
-    headerSection: {
-      textAlign: 'left' as const,
-      padding: '0 0 18px',
-      borderBottom: `1px solid ${brand.border}`,
-      margin: '0 0 16px',
+    logo: {
+      margin: '0 0 18px',
+      display: 'block' as const,
+      border: '0',
+      outline: 'none',
+      width: `${brand.logoWidth}px`,
+      height: `${brand.logoHeight}px`,
     },
-    logo: { margin: '0', display: 'block' },
+    logoRule: { borderColor: brand.border, margin: '0 0 22px' },
     contentSection: {
       backgroundColor: brand.cardBg,
       borderRadius: '4px',
-      padding: '34px 28px',
+      padding: '28px 28px 34px',
       border: `1px solid ${brand.border}`,
-      borderTop: `6px solid ${brand.accent}`,
     },
     eyebrow: {
       fontSize: '10px',
@@ -128,7 +127,7 @@ export function brandStyles(brand: EmailBrand) {
     },
     urlText: {
       fontSize: '11px',
-      color: brand.accent,
+      color: brand.muted,
       wordBreak: 'break-all' as const,
       margin: '0',
       textAlign: 'center' as const,

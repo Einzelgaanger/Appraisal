@@ -167,7 +167,18 @@ Deno.serve(async (req) => {
   })
 
   try {
-    await sendResendEmail({ from, to: recipient, subject, html, text })
+    await sendResendEmail({
+      from,
+      to: recipient,
+      subject,
+      html,
+      text,
+      inlinePng: {
+        filename: `${brand.slug}-logo.png`,
+        content: brand.logoPng,
+        contentId: 'company-logo',
+      },
+    })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Branded auth email failed', { emailType, error: errorMessage })

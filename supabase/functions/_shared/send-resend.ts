@@ -4,6 +4,7 @@ export type ResendMessage = {
   subject: string
   html: string
   text?: string
+  inlinePng?: { filename: string; content: string; contentId: string }
 }
 
 /** Send one transactional message through Resend. Throws with the API status on failure. */
@@ -25,6 +26,14 @@ export async function sendResendEmail(message: ResendMessage): Promise<void> {
       subject: message.subject,
       html: message.html,
       text: message.text,
+      attachments: message.inlinePng
+        ? [{
+          filename: message.inlinePng.filename,
+          content: message.inlinePng.content,
+          content_type: 'image/png',
+          content_id: message.inlinePng.contentId,
+        }]
+        : undefined,
     }),
   })
 

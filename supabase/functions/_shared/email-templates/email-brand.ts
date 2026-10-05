@@ -1,3 +1,5 @@
+import { GHC_LOGO_PNG, VGG_LOGO_PNG, VIGIPAY_LOGO_PNG } from './logo-png.ts'
+
 export type EmailBrandSlug = 'executiveteam' | 'ghc' | 'vigipay'
 
 export type EmailBrand = {
@@ -7,8 +9,10 @@ export type EmailBrand = {
   fromName: string
   siteUrl: string
   logoUrl: string
+  logoPng: string
   logoAlt: string
   logoWidth: number
+  logoHeight: number
   accent: string
   buttonFg: string
   heading: string
@@ -27,9 +31,11 @@ export const EMAIL_BRANDS: Record<EmailBrandSlug, EmailBrand> = {
     productName: 'BOOM workspace',
     fromName: 'VGG Executive Team',
     siteUrl: 'https://executive.vgg.tools',
-    logoUrl: 'https://executive.vgg.tools/email/vgg-logo.webp',
+    logoUrl: 'https://executive.vgg.tools/email/vgg-logo.png',
+    logoPng: VGG_LOGO_PNG,
     logoAlt: 'Venture Garden Group',
-    logoWidth: 176,
+    logoWidth: 212,
+    logoHeight: 40,
     accent: '#2e6f20',
     buttonFg: '#fbf8f1',
     heading: '#10211a',
@@ -47,8 +53,10 @@ export const EMAIL_BRANDS: Record<EmailBrandSlug, EmailBrand> = {
     fromName: 'GreenHouse Capital',
     siteUrl: 'https://ghc.vgg.tools',
     logoUrl: 'https://ghc.vgg.tools/email/ghc-mark.png',
+    logoPng: GHC_LOGO_PNG,
     logoAlt: 'GreenHouse Capital',
     logoWidth: 44,
+    logoHeight: 44,
     accent: '#003333',
     buttonFg: '#f7fbfb',
     heading: '#0a1f1f',
@@ -66,8 +74,10 @@ export const EMAIL_BRANDS: Record<EmailBrandSlug, EmailBrand> = {
     fromName: 'VigiPay',
     siteUrl: 'https://vigipay.vgg.tools',
     logoUrl: 'https://vigipay.vgg.tools/email/vigipay-logo.png',
+    logoPng: VIGIPAY_LOGO_PNG,
     logoAlt: 'VigiPay',
     logoWidth: 48,
+    logoHeight: 48,
     accent: '#003A48',
     buttonFg: '#f7fbfc',
     heading: '#062028',
