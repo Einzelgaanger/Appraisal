@@ -26,6 +26,7 @@ export interface Company {
   tenant_slug: string | null;
   company_name: string | null;
   employee_role: string | null;
+  employee_name: string | null;
   is_active: boolean;
 }
 

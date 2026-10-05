@@ -70,9 +70,10 @@ export default function CompanySwitcher({ branded = false }: { branded?: boolean
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px]">{company.company_name}</span>
-              {company.employee_role && (
+              {(company.employee_role || company.employee_name) && (
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {company.employee_role}
+                  {company.employee_name}
+                  {company.employee_role ? ` · ${company.employee_role}` : ''}
                 </span>
               )}
             </span>
