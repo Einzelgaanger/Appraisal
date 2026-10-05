@@ -6,13 +6,19 @@
  *   npm run seed:local
  */
 import {
+  EXECUTIVE_TEAM_SUBSIDIARY_ID,
   GHC_SUBSIDIARY_ID,
   VIGIPAY_SUBSIDIARY_ID,
   assertLocalSupabaseUrl,
   connectLocalPostgres,
   localEnv,
+  passwordForSubsidiary,
+  tableColumns,
   tableExists,
 } from './local-supabase.mjs';
+
+const ALFRED_EMAIL = 'alfred.mulinge@venturegardengroup.com';
+const SHOWCASE_PROJECT = 'Q4 Board pack';
 
 function iso(d) {
   return d.toISOString().slice(0, 10);
@@ -81,6 +87,23 @@ const LEAVE_NOTES = [
   null,
 ];
 
+const SHOWCASE_TASKS = [
+  { title: 'Draft the board narrative', flow: 'active', crucial: 'high', progress: 40, waiting: null, movement: 'First cut shared with the office', daysAgo: 2 },
+  { title: 'Collect appendix numbers', flow: 'waiting_external', crucial: 'critical', progress: 25, waiting: 'External auditors', movement: 'Request sent', daysAgo: 9 },
+  { title: 'Capital allocation decision', flow: 'waiting_decision', crucial: 'critical', progress: 10, waiting: 'Bunmi Akinyemiju', movement: 'Options memo sent', daysAgo: 5 },
+  { title: 'Review with the owner', flow: 'review', crucial: 'high', progress: 80, waiting: null, movement: 'Draft sitting with the owner', daysAgo: 1 },
+  { title: 'Close open questions', flow: 'waiting_dependency', crucial: 'medium', progress: 15, waiting: null, movement: 'Held for the appendix', daysAgo: 6, blockedIndex: 1 },
+  { title: 'File the final version', flow: 'done', crucial: 'medium', progress: 100, waiting: null, movement: 'Filed with the board secretariat', daysAgo: 14 },
+  { title: 'Schedule the readout', flow: 'ready', crucial: 'low', progress: 0, waiting: null, movement: null, daysAgo: 0 },
+  { title: 'Dropped appendix format', flow: 'cancelled', crucial: 'low', progress: 0, waiting: null, movement: 'Format no longer required', daysAgo: 3 },
+];
+
+function statusForFlow(flow, progress) {
+  if (flow === 'done' || progress >= 100) return 'done';
+  if (flow === 'ready' || progress === 0) return 'todo';
+  return 'in_progress';
+}
+
 async function seedProjects(local, bySub) {
   await local.query(`
     TRUNCATE TABLE
@@ -92,62 +115,136 @@ async function seedProjects(local, bySub) {
     CASCADE
   `);
 
+  const taskCols = new Set(await tableColumns(local, 'workspace_tasks'));
+  const hasFlow = taskCols.has('flow_state') && taskCols.has('cruciality');
   let projects = 0;
   let tasks = 0;
+  let showcaseId = null;
   for (const [sid, catalog] of Object.entries(PROJECTS)) {
     const people = bySub.get(sid) || [];
     if (people.length < 2) continue;
     const owner = [...people].sort((a, b) => (a.hierarchy_level ?? 99) - (b.hierarchy_level ?? 99))[0];
+    const alfred = people.find((person) => String(person.email || '').trim().toLowerCase() === ALFRED_EMAIL);
 
     for (let i = 0; i < catalog.length; i += 1) {
       const [name, description] = catalog[i];
+      const showcase = sid === EXECUTIVE_TEAM_SUBSIDIARY_ID && name === SHOWCASE_PROJECT;
       const due = iso(addDays(new Date(), 14 + i * 7));
+      const createdBy = showcase && alfred ? alfred.id : owner.id;
       const { rows } = await local.query(
         `INSERT INTO public.workspace_projects (subsidiary_id, name, description, due_date, created_by)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [sid, name, description, due, owner.id],
+        [sid, name, description, due, createdBy],
       );
       const projectId = rows[0].id;
       projects += 1;
+      if (showcase) showcaseId = projectId;
 
       const members = people;
       for (const member of members) {
+        const role = showcase
+          ? (alfred && member.id === alfred.id ? 'owner' : 'member')
+          : (member.id === owner.id ? 'owner' : 'member');
         await local.query(
           `INSERT INTO public.workspace_project_members
              (project_id, employee_id, role, status, invited_by, responded_at)
            VALUES ($1, $2, $3, 'active', $4, now())`,
-          [projectId, member.id, member.id === owner.id ? 'owner' : 'member', owner.id],
+          [projectId, member.id, role, createdBy],
         );
       }
 
-      const taskN = 5 + (i % 3);
       const createdTasks = [];
+      if (showcase && hasFlow) {
+        for (let t = 0; t < SHOWCASE_TASKS.length; t += 1) {
+          const preset = SHOWCASE_TASKS[t];
+          const assignee = t % 2 === 0 && alfred ? alfred : pick(members, t);
+          const status = statusForFlow(preset.flow, preset.progress);
+          const { rows: taskRows } = await local.query(
+            `INSERT INTO public.workspace_tasks
+               (project_id, title, notes, created_by, assignee_id, due_date, progress, status,
+                flow_state, cruciality, waiting_on, last_movement, flow_changed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now() - ($13::int * interval '1 day'))
+             RETURNING id`,
+            [
+              projectId,
+              preset.title,
+              'Local demo task. It exists only in Docker.',
+              alfred?.id || owner.id,
+              assignee.id,
+              iso(addDays(new Date(), 4 + t * 2)),
+              preset.progress,
+              status,
+              preset.flow,
+              preset.crucial,
+              preset.waiting,
+              preset.movement,
+              preset.daysAgo,
+            ],
+          );
+          createdTasks.push({ id: taskRows[0].id, assignee });
+          tasks += 1;
+        }
+        const blocked = SHOWCASE_TASKS.findIndex((preset) => preset.blockedIndex != null);
+        if (blocked >= 0 && createdTasks[blocked] && createdTasks[SHOWCASE_TASKS[blocked].blockedIndex]) {
+          await local.query(
+            `UPDATE public.workspace_tasks SET blocked_on_task_id = $2 WHERE id = $1`,
+            [createdTasks[blocked].id, createdTasks[SHOWCASE_TASKS[blocked].blockedIndex].id],
+          );
+        }
+      } else {
+      const taskN = 5 + (i % 3);
       for (let t = 0; t < taskN; t += 1) {
         const assignee = pick(members, t + i);
         const progress = [0, 20, 45, 70, 100][t % 5];
         const status = progress === 0 ? 'todo' : progress === 100 ? 'done' : 'in_progress';
-        const { rows: taskRows } = await local.query(
-          `INSERT INTO public.workspace_tasks
-             (project_id, title, notes, created_by, assignee_id, due_date, progress, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           RETURNING id`,
-          [
-            projectId,
-            pick(TASK_TITLES, t + i),
-            t % 2 === 0 ? 'Local demo task — safe to edit or delete.' : null,
-            owner.id,
-            assignee.id,
-            iso(addDays(new Date(), 5 + t * 3)),
-            progress,
-            status,
-          ],
-        );
+        const flow = progress >= 100 ? 'done' : progress > 0 ? (t % 4 === 0 ? 'waiting_external' : 'active') : 'ready';
+        const crucial = ['low', 'medium', 'high', 'critical'][t % 4];
+        const { rows: taskRows } = hasFlow
+          ? await local.query(
+            `INSERT INTO public.workspace_tasks
+               (project_id, title, notes, created_by, assignee_id, due_date, progress, status,
+                flow_state, cruciality, waiting_on, last_movement, flow_changed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now() - ($13::int * interval '1 day'))
+             RETURNING id`,
+            [
+              projectId,
+              pick(TASK_TITLES, t + i),
+              t % 2 === 0 ? 'Local demo task. It exists only in Docker.' : null,
+              owner.id,
+              assignee.id,
+              iso(addDays(new Date(), 5 + t * 3)),
+              progress,
+              status,
+              flow,
+              crucial,
+              flow === 'waiting_external' ? 'An outside party' : null,
+              progress > 0 ? 'Local demo movement' : null,
+              (t % 4) * 3,
+            ],
+          )
+          : await local.query(
+            `INSERT INTO public.workspace_tasks
+               (project_id, title, notes, created_by, assignee_id, due_date, progress, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id`,
+            [
+              projectId,
+              pick(TASK_TITLES, t + i),
+              t % 2 === 0 ? 'Local demo task. It exists only in Docker.' : null,
+              owner.id,
+              assignee.id,
+              iso(addDays(new Date(), 5 + t * 3)),
+              progress,
+              status,
+            ],
+          );
         createdTasks.push({ id: taskRows[0].id, assignee });
         tasks += 1;
       }
+      }
 
-      if (members.length > 2 && createdTasks[1]) {
+      if (!showcase && members.length > 2 && createdTasks[1]) {
         const from = createdTasks[1].assignee;
         const to = members.find((m) => m.id !== from.id && m.id !== owner.id) || members[1];
         await local.query(
@@ -165,11 +262,13 @@ async function seedProjects(local, bySub) {
            ($1, $2, $3, 'project.created', jsonb_build_object('name', $4::text)),
            ($1, $2, $3, 'member.invited', jsonb_build_object('count', $5::int)),
            ($1, $2, $3, 'task.created', jsonb_build_object('count', $6::int))`,
-        [sid, projectId, owner.id, name, members.length, taskN],
+        [sid, projectId, createdBy, name, members.length, createdTasks.length],
       );
     }
   }
   console.log(`  projects: ${projects}, tasks: ${tasks}`);
+  if (!showcaseId) console.log('  Q4 Board pack was not seeded (Executive Team roster is missing).');
+  return showcaseId;
 }
 
 async function seedLeave(local, bySub) {
@@ -461,9 +560,19 @@ async function main() {
       quarter,
     );
 
+    const alfred = employees.find((person) => String(person.email || '').trim().toLowerCase() === ALFRED_EMAIL);
     console.log('');
-    console.log('Local demo data is ready. Create / delete anything — it stays in Docker.');
+    console.log('Local demo data is ready. It stays in Docker.');
     console.log('git push sends code and schema, not this data.');
+    if (alfred) {
+      console.log('');
+      console.log('Review Q4 Board pack on the local app only:');
+      console.log('  http://localhost:8081/login?tenant=executiveteam');
+      console.log(`  ${ALFRED_EMAIL}`);
+      console.log(`  ${passwordForSubsidiary(alfred.subsidiary_id)}`);
+    } else {
+      console.log('Alfred is not on the local roster. Run npm run db:local:sync, then npm run seed:local again.');
+    }
   } finally {
     await local.end().catch(() => {});
   }

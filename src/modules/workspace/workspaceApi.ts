@@ -5,6 +5,37 @@ const db = supabase as any;
 export type ProjectMembershipStatus = 'invited' | 'active' | 'declined';
 export type ProjectRole = 'owner' | 'member';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
+export type TaskFlowState =
+  | 'ready'
+  | 'active'
+  | 'waiting_internal'
+  | 'waiting_external'
+  | 'waiting_decision'
+  | 'waiting_dependency'
+  | 'review'
+  | 'done'
+  | 'cancelled';
+export type TaskCruciality = 'low' | 'medium' | 'high' | 'critical';
+export type ProjectViewReason = 'member' | 'line_manager' | 'leadership';
+
+export const FLOW_LABELS: Record<TaskFlowState, string> = {
+  ready: 'Ready',
+  active: 'Moving',
+  waiting_internal: 'Waiting on someone here',
+  waiting_external: 'Waiting outside',
+  waiting_decision: 'Waiting on a decision',
+  waiting_dependency: 'Waiting on another task',
+  review: 'In review',
+  done: 'Done',
+  cancelled: 'Cancelled',
+};
+
+export const CRUCIAL_LABELS: Record<TaskCruciality, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+};
 
 export type WorkspaceProjectListItem = {
   id: string;
@@ -13,7 +44,7 @@ export type WorkspaceProjectListItem = {
   due_date: string | null;
   created_at: string;
   created_by: string;
-  my_role: ProjectRole;
+  my_role: ProjectRole | 'viewer';
   my_status: ProjectMembershipStatus;
   owner_id: string | null;
   owner_name: string | null;
@@ -21,6 +52,23 @@ export type WorkspaceProjectListItem = {
   task_count: number;
   done_count: number;
   member_count: number;
+  remaining_count: number;
+  waiting_count: number;
+  crucial_count: number;
+  oldest_wait_days: number;
+  view_reason: ProjectViewReason;
+  can_edit: boolean;
+  crucial_remaining: CrucialTask[];
+};
+
+export type CrucialTask = {
+  id: string;
+  title: string;
+  flow_state: TaskFlowState;
+  cruciality: TaskCruciality;
+  assignee_name: string;
+  waiting_on: string | null;
+  wait_days: number;
 };
 
 export type WorkspaceMember = {
@@ -41,6 +89,12 @@ export type WorkspaceTask = {
   due_date: string | null;
   progress: number;
   status: TaskStatus;
+  flow_state: TaskFlowState;
+  cruciality: TaskCruciality;
+  waiting_on: string | null;
+  last_movement: string | null;
+  blocked_on_task_id: string | null;
+  wait_days: number;
   pending_delegation: {
     id: string;
     to_employee_id: string;
@@ -68,8 +122,19 @@ export type WorkspaceProjectDetail = {
     created_by: string;
     progress_pct: number;
     task_count: number;
+    done_count: number;
+    remaining_count: number;
+    waiting_count: number;
+    crucial_count: number;
+    oldest_wait_days: number;
+    crucial_remaining: CrucialTask[];
   };
-  my_membership: { role: ProjectRole; status: ProjectMembershipStatus };
+  my_membership: {
+    role: ProjectRole | 'viewer';
+    status: ProjectMembershipStatus;
+    can_edit: boolean;
+    view_reason: ProjectViewReason;
+  };
   members: WorkspaceMember[];
   tasks: WorkspaceTask[];
   activity: WorkspaceActivity[];
@@ -142,6 +207,7 @@ export async function createTask(payload: {
   notes?: string;
   assigneeId?: string | null;
   dueDate?: string | null;
+  cruciality?: TaskCruciality;
 }): Promise<string> {
   const { data, error } = await db.rpc('workspace_create_task', {
     _project_id: payload.projectId,
@@ -149,9 +215,29 @@ export async function createTask(payload: {
     _notes: payload.notes ?? null,
     _assignee_id: payload.assigneeId || null,
     _due_date: payload.dueDate || null,
+    _cruciality: payload.cruciality ?? 'medium',
   });
   if (error) rpcError(error);
   return data as string;
+}
+
+export async function updateTask(payload: {
+  taskId: string;
+  flowState: TaskFlowState;
+  cruciality: TaskCruciality;
+  waitingOn?: string | null;
+  lastMovement?: string | null;
+  blockedOnTaskId?: string | null;
+}): Promise<void> {
+  const { error } = await db.rpc('workspace_update_task', {
+    _task_id: payload.taskId,
+    _flow_state: payload.flowState,
+    _cruciality: payload.cruciality,
+    _waiting_on: payload.waitingOn ?? null,
+    _last_movement: payload.lastMovement ?? null,
+    _blocked_on_task_id: payload.blockedOnTaskId || null,
+  });
+  if (error) rpcError(error);
 }
 
 export async function setTaskProgress(taskId: string, progress: number): Promise<void> {
