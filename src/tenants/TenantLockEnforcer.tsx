@@ -49,9 +49,12 @@ export default function TenantLockEnforcer({ children }: { children: ReactNode }
     const asked = tenantSlugFromHost(window.location.hostname, location.search);
     if (asked && asked !== lockedTenantSlug) {
       const seats = companies.filter((company) => company.tenant_slug === asked);
-      const ownName = profile?.name?.trim().toLowerCase();
-      const ownSeat = seats.find((company) => company.employee_name?.trim().toLowerCase() === ownName)
-        ?? (seats.length === 1 ? seats[0] : null);
+      const ownName = profile?.name?.trim().toLowerCase() ?? '';
+      // Only the seat that belongs to this person. A single seat under someone
+      // else's name must not be opened, or the visit lands on the wrong company.
+      const ownSeat = ownName
+        ? seats.find((company) => company.employee_name?.trim().toLowerCase() === ownName) ?? null
+        : (seats.length === 1 ? seats[0] : null);
       if (ownSeat && failedSeat.current !== ownSeat.employee_id) {
         if (!ownSeat.is_active) {
           adopting.current = true;
