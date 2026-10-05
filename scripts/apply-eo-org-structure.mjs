@@ -88,6 +88,7 @@ async function main() {
   const deyi = await byEmail('deyi.dipeolu@venturegardengroup.com');
   const omotola = await byEmail('omotola.akinyemiju@venturegardengroup.com');
   const ayomide = await byEmail('adeosun.ayomide@venturegardengroup.com');
+  const baluku = await byEmail('baluku.dounnah@venturegardengroup.com');
 
   await patch('bunmi.akinyemiju@peopleos.co', {
     hierarchy_level: 0,
@@ -184,16 +185,26 @@ async function main() {
     });
   }
 
+  await patch('baluku.dounnah@venturegardengroup.com', {
+    hierarchy_level: 1,
+    department_code: 'central_ops',
+    manager_id: uche,
+    secondary_manager_id: null,
+    appraisal_self_performance: false,
+    appraisal_gives_comments: false,
+    appraisal_receives_comments: true,
+    eo_appraisal_active: true,
+  });
+
   for (const email of [
     'regina.ottoh-ebhonu@venturegardengroup.com',
     'melissa.omede@venturegardengroup.com',
-    'baluku.dounnah@venturegardengroup.com',
     'chukwuka.monyei@venturegardengroup.com',
   ]) {
     await patch(email, {
       hierarchy_level: 2,
       department_code: 'central_ops',
-      manager_id: uche,
+      manager_id: baluku,
       secondary_manager_id: null,
       appraisal_receives_comments: true,
       eo_appraisal_active: true,

@@ -734,6 +734,7 @@ export default function BoomReviewHub({
         {canViewDirectory && (
         <TabsContent value="directory" className="mt-0">
           <BoomDirectoryPanel
+            viewerEmployeeId={reviewerEmployeeId}
             viewerHierarchyLevel={reviewerHierarchyLevel}
             isAdmin={isPlatformAdmin}
             periodQuarter={periodQuarter}

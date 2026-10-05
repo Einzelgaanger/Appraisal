@@ -88,7 +88,10 @@ function eaStatusBadge(status: string | undefined) {
   }
 }
 
+const COMPANY_DIRECTORY_CODES = new Set(['l1_uche', 'l1_gisele', 'l1_omotola', 'l1_deyi']);
+
 interface BoomDirectoryPanelProps {
+  viewerEmployeeId?: string | null;
   viewerHierarchyLevel: number | null;
   isAdmin: boolean;
   periodQuarter?: string;
@@ -96,6 +99,7 @@ interface BoomDirectoryPanelProps {
 }
 
 export default function BoomDirectoryPanel({
+  viewerEmployeeId = null,
   viewerHierarchyLevel,
   isAdmin,
   periodQuarter = defaultQuarterPeriod(),
@@ -126,16 +130,31 @@ export default function BoomDirectoryPanel({
     setEaRoster(eaStatus);
 
     const { data, error } = rosterRes;
-    if (!error && data?.length) {
+    if (!error && Array.isArray(data)) {
       setRows(data as RosterRow[]);
     } else if (isAdmin || viewerHierarchyLevel === 0 || viewerHierarchyLevel === 1) {
-      const { data: fallback } = await supabase
+      const viewer = viewerEmployeeId
+        ? await supabase
+            .from('employees')
+            .select('department_code')
+            .eq('id', viewerEmployeeId)
+            .maybeSingle()
+        : { data: null };
+      const companyDirectory =
+        isAdmin ||
+        viewerHierarchyLevel === 0 ||
+        COMPANY_DIRECTORY_CODES.has(viewer.data?.department_code ?? '');
+      let query = supabase
         .from('employees')
-        .select('id, name, email, role, department, department_code, manager:manager_id(name)')
+        .select('id, name, email, role, department, department_code, manager_id, secondary_manager_id, manager:manager_id(name)')
         .eq('subsidiary_id', EO_SUBSIDIARY)
         .eq('hierarchy_level', 2)
         .eq('eo_appraisal_active', true)
         .order('name');
+      if (!companyDirectory && viewerEmployeeId) {
+        query = query.or(`manager_id.eq.${viewerEmployeeId},secondary_manager_id.eq.${viewerEmployeeId}`);
+      }
+      const { data: fallback } = await query;
       setRows(
         (fallback ?? []).map((e: Record<string, unknown>) => ({
           employee_id: e.id as string,
@@ -151,7 +170,7 @@ export default function BoomDirectoryPanel({
       setRows([]);
     }
     setLoading(false);
-  }, [canView, isAdmin, viewerHierarchyLevel, periodQuarter]);
+  }, [canView, isAdmin, viewerEmployeeId, viewerHierarchyLevel, periodQuarter]);
 
   useEffect(() => {
     void load();
