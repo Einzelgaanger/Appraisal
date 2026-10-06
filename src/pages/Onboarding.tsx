@@ -41,7 +41,7 @@ const EO_SLIDES: SlideDef[] = [
     kicker: 'Survey · Dashboard · Growth · Rankings',
     headlineHTML: 'Assignments first. <em>Insight second.</em>',
     body:
-      'Open the Survey tab for your BOOM queue (peer reviews, executive form, EA or monthly tasks). My Dashboard shows legacy survey scores and/or released peer-360 averages by behaviour section. Growth Hub and Rankings turn feedback into development — HR controls when aggregate 360 is visible.',
+      'Open the Survey tab for your BOOM queue (peer reviews, executive form, Executive Office Quarterly Evaluation, or monthly tasks). My Dashboard shows legacy survey scores and peer-360 averages by behaviour section as soon as colleagues submit. Growth Hub and Rankings turn that feedback into development.',
     image: heroFeedbackSession,
     caption: 'Fig. 02 — Reviews and analytics together',
   },
@@ -74,7 +74,7 @@ const GHC_SLIDES: SlideDef[] = [
     kicker: 'Tasks · Results · Directory · Monitor',
     headlineHTML: 'Line-manager work. <em>Clear pools.</em>',
     body:
-      'Tasks follow your reporting line. My results show released 360 themes, monthly reviews you received, and quarterly evaluation detail plus discussion. HR releases aggregates and finalises partner actions.',
+      'Tasks follow your reporting line. My results show 360 themes for everyone at the same time, monthly reviews you received, and quarterly evaluation detail plus discussion. People Ops finalises partner actions.',
     image: heroFeedbackSession,
     caption: 'Fig. 02 — GHC reviews and results',
   },
@@ -107,7 +107,7 @@ const VIGIPAY_SLIDES: SlideDef[] = [
     kicker: 'Tasks · Results · Directory · Monitor',
     headlineHTML: 'Your VigiPay line. <em>Your roster.</em>',
     body:
-      'Managers review their mapped reports. Peer 360 stays inside the VigiPay roster. People Ops / GM release results. Forms will be swapped when VigiPay sends its own spec.',
+      'Managers review their mapped reports. Peer 360 stays inside the VigiPay roster and results open for everyone together. Forms will be swapped when VigiPay sends its own spec.',
     image: heroFeedbackSession,
     caption: 'Fig. 02 — VigiPay reviews and results',
   },
@@ -147,25 +147,25 @@ export default function Onboarding() {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <img src={brand.logoMark} alt={brand.logoAlt} className="h-7 w-auto sm:h-8 rounded-md object-contain" />
           <div className="hidden h-5 w-px bg-border sm:block" />
-          <span className="font-mono hidden sm:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+          <span className="hidden text-sm text-muted-foreground sm:inline">
             {ghc ? 'GreenHouse Capital · Appraisal' : vigipay ? 'VigiPay · Appraisal' : 'VGG / BOOM — EO Appraisal'}
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="font-mono hidden lg:inline text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+          <span className="hidden text-sm text-muted-foreground lg:inline">
             {ghc ? 'GHC · 2026' : vigipay ? 'VigiPay · 2026' : 'BOOM v2 · 2026'}
           </span>
           <Button
             variant="green"
             size="sm"
-            className="h-8 px-3 text-xs"
+            className="h-9 rounded-2xl px-3 font-sans text-sm font-medium normal-case tracking-normal"
             onClick={() =>
               navigate(
                 vigipay ? '/login?tenant=vigipay' : ghc ? '/login?tenant=ghc' : '/login',
               )
             }
           >
-            Sign In
+            Sign in
           </Button>
         </div>
       </header>
@@ -245,10 +245,10 @@ export default function Onboarding() {
         {/* Left: editorial photo with caption */}
         <div className="relative order-2 hidden flex-1 flex-col bg-paper-deep/40 lg:order-1 lg:flex">
           <div className="flex items-center justify-between border-b border-border px-8 py-4">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               Index {String(slide + 1).padStart(3, '0')} / 2026
             </span>
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {current.kicker}
             </span>
           </div>
@@ -273,10 +273,10 @@ export default function Onboarding() {
           </div>
 
           <div className="flex items-center justify-between border-t border-border px-8 py-4">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {current.caption}
             </span>
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               № {current.no}
             </span>
           </div>
@@ -293,7 +293,7 @@ export default function Onboarding() {
               transition={SLIDE}
               className="max-w-xl"
             >
-              <span className="eyebrow-primary">◉ {current.kicker}</span>
+              <span className="inline-flex rounded-full bg-teal-100 px-3 py-1 text-[13px] font-medium text-teal-800">{current.kicker}</span>
 
               <h1
                 className="headline-collage display-serif mt-2.5 text-[clamp(1.35rem,5.8vw,3.8rem)] font-semibold leading-[1] tracking-[-0.02em] text-foreground sm:mt-4"
@@ -306,9 +306,7 @@ export default function Onboarding() {
 
               {!isLast && (
                 <div className="mt-5 rounded-md border border-border bg-card/80 p-3 sm:p-3.5">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
-                    Coming next
-                  </p>
+                  <p className="text-sm font-medium text-foreground/70">Coming next</p>
                   <p className="mt-1 text-[13px] text-foreground">
                     {slides[slide + 1].label}: {slides[slide + 1].kicker}
                   </p>
@@ -317,11 +315,11 @@ export default function Onboarding() {
 
               {isLast && (
                 <div className="mt-6 grid grid-cols-1 gap-2 sm:mt-8 sm:grid-cols-2">
-                  <Button size="lg" variant="green" onClick={() => navigate('/login')} className="h-9 w-full justify-center gap-1.5 rounded-md px-3.5 text-xs font-medium normal-case">
-                    <KeyRound className="h-3.5 w-3.5" /> Sign in
+                  <Button size="lg" variant="green" onClick={() => navigate('/login')} className="h-11 w-full justify-center gap-2 rounded-2xl bg-teal-500 px-4 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
+                    <KeyRound className="h-4 w-4" /> Sign in
                   </Button>
-                  <Button size="lg" variant="outline" onClick={() => navigate('/find-account')} className="h-9 w-full justify-center gap-1.5 rounded-md px-3.5 text-xs font-medium normal-case">
-                    <Search className="h-3.5 w-3.5" /> Find my account
+                  <Button size="lg" variant="outline" onClick={() => navigate('/find-account')} className="h-11 w-full justify-center gap-2 rounded-2xl px-4 font-sans text-sm font-medium normal-case tracking-normal">
+                    <Search className="h-4 w-4" /> Find my account
                   </Button>
                 </div>
               )}
@@ -340,16 +338,16 @@ export default function Onboarding() {
                 onClick={prev}
                 disabled={slide === 0}
                 aria-label="Previous"
-                className="h-8 w-8 shrink-0 rounded-md"
+                className="h-10 w-10 shrink-0 rounded-2xl"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
               {isLast ? (
-                <Button size="default" variant="green" onClick={() => navigate('/login')} className="h-8 min-w-[90px] rounded-md px-3 text-xs font-medium normal-case">
+                <Button size="default" variant="green" onClick={() => navigate('/login')} className="h-10 min-w-[96px] rounded-2xl bg-teal-500 px-4 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
                   Enter
                 </Button>
               ) : (
-                <Button variant="default" size="default" onClick={next} aria-label="Next" className="h-8 rounded-md px-3 text-xs font-medium normal-case">
+                <Button variant="default" size="default" onClick={next} aria-label="Next" className="h-10 rounded-2xl bg-teal-500 px-4 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
                   Next
                 </Button>
               )}

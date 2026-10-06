@@ -84,7 +84,7 @@ export default function LearningProfilePanel({ userId }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <div className="mono text-[10px] uppercase tracking-[0.18em] text-foreground/70 mb-2">Preferred formats</div>
+          <div className="mb-2 text-sm font-medium text-foreground/70">Preferred formats</div>
           {profile.preferredFormats.length ? (
             <div className="flex flex-wrap gap-1.5">
               {profile.preferredFormats.map(f => <span key={f} className="tag-solid">{f}</span>)}
@@ -93,7 +93,7 @@ export default function LearningProfilePanel({ userId }: Props) {
         </div>
 
         <div>
-          <div className="mono text-[10px] uppercase tracking-[0.18em] text-foreground/70 mb-2">Focus area weights</div>
+          <div className="mb-2 text-sm font-medium text-foreground/70">Focus area weights</div>
           {profile.topFocus.length ? (
             <div className="space-y-1.5">
               {profile.topFocus.map(t => (
@@ -112,7 +112,7 @@ export default function LearningProfilePanel({ userId }: Props) {
         </div>
 
         <div>
-          <div className="mono text-[10px] uppercase tracking-[0.18em] text-foreground/70 mb-2">Signal volume</div>
+          <div className="mb-2 text-sm font-medium text-foreground/70">Signal volume</div>
           <ul className="text-sm space-y-1">
             <li><span className="mono font-bold">{profile.totals.interactions}</span> interactions logged</li>
             <li><span className="mono font-bold">{profile.totals.feedback}</span> resources rated</li>

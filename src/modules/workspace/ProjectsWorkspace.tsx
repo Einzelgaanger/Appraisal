@@ -399,7 +399,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
         </section>
       )}
 
-      <PlannerLadder projects={myProjects} directory={directory} onOpenProject={onOpenProject} onChanged={loadList} />
+      <PlannerLadder projects={myProjects} directory={directory} onOpenProject={onOpenProject} onChanged={loadList} onAddProject={() => setCreateOpen(true)} />
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -412,6 +412,9 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             Open one for this company. People on it, their line manager, and company leadership will be able to read it.
           </p>
+          <Button className={cn(softButton, 'mt-4 gap-2 bg-teal-500 text-white hover:bg-teal-600')} onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> Add project
+          </Button>
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">

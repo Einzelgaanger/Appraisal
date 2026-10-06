@@ -851,10 +851,8 @@
   vertical-align: top;
 }
 .docs-prose thead th {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  font-size: 0.875rem;
+  font-weight: 500;
   color: hsl(var(--muted-foreground));
-  border-bottom: 1.5px solid hsl(var(--foreground) / 0.3);
+  border-bottom: 1.5px solid hsl(var(--foreground) / 0.15);
 }

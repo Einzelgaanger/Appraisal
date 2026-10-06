@@ -253,7 +253,7 @@ export default function EmployeeDashboard() {
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
               Legacy multi-subsidiary survey scores appear here if your record has received reviews. For the Executive Office,
               your <strong>BOOM peer 360</strong> averages (quarter <span className="font-mono">{defaultQuarterPeriod()}</span>)
-              show here after HR releases results and enough peers have submitted — complete any open 360 tasks under{' '}
+              show here as soon as peers have submitted — complete any open 360 tasks under{' '}
               <strong>Survey → BOOM workspace</strong>.
             </p>
           </motion.div>

@@ -216,7 +216,7 @@ function ResultsPanel({ formCode, results, viewerRole }: { formCode: string; res
       {formCode === 'ea_quarterly' && scorePct != null && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Quarter score</p>
+            <p className="text-sm text-muted-foreground">Quarter score</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {avgScore!.toFixed(2)}/5 across {scored.length} ratings
             </p>
@@ -410,7 +410,7 @@ export default function BoomDiscussionsPanel({
           <Button
             size="sm"
             variant={view === 'inbox' ? 'default' : 'outline'}
-            className="text-xs h-8"
+            className="h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal"
             onClick={() => setView('inbox')}
           >
             My discussions
@@ -418,7 +418,7 @@ export default function BoomDiscussionsPanel({
           <Button
             size="sm"
             variant={view === 'peer360' ? 'default' : 'outline'}
-            className="text-xs h-8 gap-1"
+            className="h-9 gap-1.5 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal"
             onClick={() => setView('peer360')}
           >
             <Users className="w-3 h-3" /> Team 360 roster
@@ -432,7 +432,7 @@ export default function BoomDiscussionsPanel({
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(240px,320px)_1fr] lg:items-start min-h-[420px]">
-          <div className="glass-panel p-4 space-y-3 overflow-y-auto max-h-[70vh] scrollbar-thin">
+          <div className="max-h-[70vh] space-y-3 overflow-y-auto rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5 scrollbar-thin">
             {view === 'peer360' && oversight ? (
               <>
                 <h4 className="text-sm font-semibold">360 — your team</h4>
@@ -482,7 +482,7 @@ export default function BoomDiscussionsPanel({
                   <div className="space-y-4">
                     {[...groupedInbox.entries()].map(([code, rows]) => (
                       <div key={code}>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
+                        <p className="mb-2 text-sm font-medium text-foreground/70">
                           {DISCUSSION_FORM_LABELS[code] ?? code}
                         </p>
                         <ul className="space-y-1">
@@ -526,7 +526,7 @@ export default function BoomDiscussionsPanel({
             )}
           </div>
 
-          <div className="glass-panel p-4 flex flex-col min-h-[360px] max-h-[min(78vh,820px)] overflow-hidden">
+          <div className="flex min-h-[360px] max-h-[min(78vh,820px)] flex-col overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
             {!selectedId ? (
               <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground text-center px-4">
                 Select a person or discussion on the left to open the chat.
@@ -553,7 +553,7 @@ export default function BoomDiscussionsPanel({
 
                 <div className="grid gap-4 flex-1 min-h-0 lg:grid-cols-2 overflow-y-auto lg:overflow-hidden scrollbar-thin">
                   <div className="min-h-0 lg:overflow-y-auto lg:pr-2 scrollbar-thin">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2 sticky top-0 bg-card/95 backdrop-blur-sm z-10 py-0.5">
+                    <p className="sticky top-0 z-10 mb-2 bg-white/95 py-0.5 text-sm font-medium text-foreground/70 backdrop-blur-sm">
                       Submitted results
                     </p>
                     <ResultsPanel
@@ -564,7 +564,7 @@ export default function BoomDiscussionsPanel({
                   </div>
 
                   <div className="flex flex-col min-h-[220px] lg:min-h-0 border-t lg:border-t-0 lg:border-l border-border pt-4 lg:pt-0 lg:pl-4">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2 shrink-0">Discussion</p>
+                    <p className="mb-2 shrink-0 text-sm font-medium text-foreground/70">Discussion</p>
                     <div className="flex-1 overflow-y-auto space-y-2 mb-3 min-h-[100px] max-h-[40vh] lg:max-h-none scrollbar-thin">
                       {thread.messages.length === 0 ? (
                         <p className="text-xs text-muted-foreground italic">No messages yet — start the conversation.</p>
@@ -601,7 +601,7 @@ export default function BoomDiscussionsPanel({
                       />
                       <Button
                         size="icon"
-                        className="shrink-0 h-auto"
+                        className="h-11 w-11 shrink-0 rounded-2xl bg-teal-500 text-white hover:bg-teal-600"
                         disabled={sending || !message.trim()}
                         onClick={() => void sendMessage()}
                       >
@@ -614,7 +614,7 @@ export default function BoomDiscussionsPanel({
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground text-center px-4">
                 <p>Could not open this discussion.</p>
-                <Button variant="outline" size="sm" className="h-8" onClick={() => void loadThread(selectedId)}>
+                <Button variant="outline" size="sm" className="h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal" onClick={() => void loadThread(selectedId)}>
                   Retry
                 </Button>
               </div>
@@ -623,7 +623,7 @@ export default function BoomDiscussionsPanel({
         </div>
       )}
 
-      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void refresh()}>
+      <Button variant="outline" size="sm" className="h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal" onClick={() => void refresh()}>
         Refresh discussions
       </Button>
     </div>

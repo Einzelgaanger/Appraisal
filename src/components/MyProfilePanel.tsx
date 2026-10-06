@@ -32,6 +32,8 @@ import {
 } from '@/lib/hierarchyConvention';
 import { isGhcStyleAppraisal, isGhcTenant } from '@/tenants/config';
 import { companyDirectory, type WorkspaceColleague } from '@/modules/workspace/workspaceApi';
+import { asStringList, extrasExcept, formatRoles, formatTeams } from '@/lib/personCoverage';
+import CoverageEditor from '@/components/org/CoverageEditor';
 import { cn } from '@/lib/utils';
 
 const AVATAR_TONES = [
@@ -65,7 +67,9 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
 type Props = {
   companyName: string | null;
   employeeRole: string | null;
+  employeeAdditionalRoles?: string[] | null;
   employeeDepartment: string | null;
+  employeeAdditionalDepartments?: string[] | null;
   employeeName: string | null;
   onSaved?: () => void;
 };
@@ -82,7 +86,9 @@ function initials(name: string) {
 export default function MyProfilePanel({
   companyName,
   employeeRole,
+  employeeAdditionalRoles,
   employeeDepartment,
+  employeeAdditionalDepartments,
   employeeName,
   onSaved,
 }: Props) {
@@ -91,7 +97,9 @@ export default function MyProfilePanel({
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [extraRoles, setExtraRoles] = useState<string[]>([]);
   const [department, setDepartment] = useState('');
+  const [extraDepartments, setExtraDepartments] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -104,9 +112,11 @@ export default function MyProfilePanel({
   useEffect(() => {
     setName(employeeName || profile?.name || '');
     setRole(employeeRole || profile?.role || '');
+    setExtraRoles(extrasExcept(employeeRole || profile?.role, asStringList(employeeAdditionalRoles)));
     setDepartment(employeeDepartment || profile?.department || '');
+    setExtraDepartments(extrasExcept(employeeDepartment || profile?.department, asStringList(employeeAdditionalDepartments)));
     setAvatarUrl((profile as { avatar_url?: string | null } | null)?.avatar_url ?? null);
-  }, [employeeName, employeeRole, employeeDepartment, profile]);
+  }, [employeeName, employeeRole, employeeAdditionalRoles, employeeDepartment, employeeAdditionalDepartments, profile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,9 +150,15 @@ export default function MyProfilePanel({
   const departmentOptions = useMemo(() => {
     const current = department.trim();
     const base = ghc ? [...GHC_DEPARTMENTS] : ghcStyle ? [...VIGIPAY_DEPARTMENTS] : [];
+    for (const person of teammates) {
+      for (const team of [person.department, ...(person.additional_departments ?? [])]) {
+        const label = team?.trim();
+        if (label && !base.some((item) => item.toLowerCase() === label.toLowerCase())) base.push(label);
+      }
+    }
     if (current && !base.some((d) => d.toLowerCase() === current.toLowerCase())) base.unshift(current);
     return base;
-  }, [ghc, ghcStyle, department]);
+  }, [ghc, ghcStyle, department, teammates]);
 
   const roleOptions = useMemo(() => {
     const current = role.trim();
@@ -190,12 +206,23 @@ export default function MyProfilePanel({
     }
     setSaving(true);
     try {
-      const { error } = await db.rpc('update_my_profile', {
+      const payload = {
         _name: name.trim(),
         _role: role.trim(),
         _department: department.trim() || null,
         _avatar_url: avatarUrl,
-      });
+        _additional_departments: extrasExcept(department, extraDepartments),
+        _additional_roles: extrasExcept(role, extraRoles),
+      };
+      let { error } = await db.rpc('update_my_profile', payload);
+      if (error && /additional_|schema cache|Could not find the function/i.test(error.message ?? '')) {
+        ({ error } = await db.rpc('update_my_profile', {
+          _name: payload._name,
+          _role: payload._role,
+          _department: payload._department,
+          _avatar_url: payload._avatar_url,
+        }));
+      }
       if (error) throw error;
       await refreshProfile();
       onSaved?.();
@@ -239,13 +266,13 @@ export default function MyProfilePanel({
           {role.trim() ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-[12px] font-medium text-amber-800">
               <Briefcase className="h-3.5 w-3.5" />
-              {role.trim()}
+              {formatRoles(role, extraRoles, '')}
             </span>
           ) : null}
-          {department.trim() ? (
+          {department.trim() || extraDepartments.length > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-1 text-[12px] font-medium text-teal-800">
               <Users className="h-3.5 w-3.5" />
-              {department.trim()}
+              {formatTeams(department, extraDepartments, '')}
             </span>
           ) : null}
         </div>
@@ -334,6 +361,16 @@ export default function MyProfilePanel({
               <Input id="profile-dept" className={fieldClass} value={department} onChange={(e) => setDepartment(e.target.value)} />
             )}
           </ProfileField>
+          <CoverageEditor
+            primaryDepartment={department}
+            primaryRole={role}
+            departmentOptions={departmentOptions}
+            roleOptions={roleOptions}
+            extraDepartments={extraDepartments}
+            extraRoles={extraRoles}
+            onDepartments={setExtraDepartments}
+            onRoles={setExtraRoles}
+          />
           <ProfileField id="profile-company" label="Company" hint="Set by People Ops" icon={Building2} chip="rounded-[10px] bg-indigo-100 text-indigo-700">
             <Input id="profile-company" className={cn(fieldClass, lockedClass)} value={companyName ?? ''} disabled readOnly />
           </ProfileField>
@@ -397,7 +434,11 @@ export default function MyProfilePanel({
                             {person.name}
                             {mine ? <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[11px] font-medium text-rose-700">You</span> : null}
                           </p>
-                          <p className="truncate text-[13px] text-muted-foreground">{person.role || 'No role set'}</p>
+                          <p className="truncate text-[13px] text-muted-foreground">
+                            {formatRoles(person.role, person.additional_roles, 'No role set')}
+                            {' · '}
+                            {formatTeams(person.department, person.additional_departments, 'No team')}
+                          </p>
                         </div>
                       </li>
                     );

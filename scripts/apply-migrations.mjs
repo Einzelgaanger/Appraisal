@@ -45,6 +45,25 @@ function migrationVersion(filename) {
   return filename.replace(/\.sql$/, '');
 }
 
+/** Older Supabase history rows store only the numeric prefix, not the filename. */
+function migrationStamp(filename) {
+  return migrationVersion(filename).split('_')[0];
+}
+
+function pendingFiles(files, applied) {
+  const stampCounts = new Map();
+  for (const file of files) {
+    const stamp = migrationStamp(file);
+    stampCounts.set(stamp, (stampCounts.get(stamp) ?? 0) + 1);
+  }
+  return files.filter((file) => {
+    const version = migrationVersion(file);
+    if (applied.has(version)) return false;
+    const stamp = migrationStamp(file);
+    return !(applied.has(stamp) && stampCounts.get(stamp) === 1);
+  });
+}
+
 async function ensureMigrationsTable(client) {
   await client.query('CREATE SCHEMA IF NOT EXISTS supabase_migrations');
   await client.query(`
@@ -65,7 +84,11 @@ async function appliedVersions(client) {
 
 let client = null;
 for (const url of candidateUrls()) {
-  const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const c = new Client({
+    connectionString: url,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 20000,
+  });
   try {
     await c.connect();
     console.log('Connected to database');
@@ -89,7 +112,7 @@ try {
     .filter((f) => f.endsWith('.sql'))
     .sort();
 
-  const pending = files.filter((f) => !done.has(migrationVersion(f)));
+  const pending = pendingFiles(files, done);
   if (!pending.length) {
     console.log('No pending migrations.');
     process.exit(0);

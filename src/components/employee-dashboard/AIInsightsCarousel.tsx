@@ -135,7 +135,7 @@ Return ONLY a JSON array of strings, no markdown, no explanation. Example: ["Ins
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">AI Insight</p>
+            <p className="text-sm font-medium text-teal-800">Insight</p>
             {insights.length > 1 && (
               <div className="flex gap-0.5">
                 {insights.map((_, i) => (

@@ -14,7 +14,7 @@ import AIChatPanel from '@/components/dashboard/AIChatPanel';
 import {
   BarChart3, Users, Building2, ClipboardCheck, ArrowLeft, RefreshCw,
   TrendingUp, Clock, ChevronDown, ChevronUp, Zap, Search,
-  Star, Target, Trophy, Activity, Brain, Layers, Download, Lock, Unlock,
+  Star, Target, Trophy, Activity, Brain, Layers, Download, Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppraisalAdminSkeleton } from '@/components/shell/LoadingShells';
@@ -64,15 +64,6 @@ interface BoomAnswerRow {
 }
 interface BoomFormRow { id: string; code: string; title: string }
 interface BoomQuestionRow { id: string; form_id: string; question_text: string }
-interface BoomReleaseRow {
-  id: string;
-  form_id: string;
-  period: string;
-  released_at: string;
-  released_by: string | null;
-  note: string | null;
-  assessment_forms: { code: string; title: string } | null;
-}
 
 const CHART_COLORS = [
   'hsl(145, 63%, 42%)', 'hsl(210, 72%, 45%)', 'hsl(38, 80%, 50%)',
@@ -105,10 +96,6 @@ export default function AppraisalAdmin() {
   const [boomForms, setBoomForms] = useState<BoomFormRow[]>([]);
   const [boomQuestions, setBoomQuestions] = useState<BoomQuestionRow[]>([]);
   const [boomPeriodFilter, setBoomPeriodFilter] = useState<string>('all');
-  const [boomReleases, setBoomReleases] = useState<BoomReleaseRow[]>([]);
-  const [releasePeriodInput, setReleasePeriodInput] = useState('');
-  const [releaseNoteInput, setReleaseNoteInput] = useState('');
-  const [releaseBusy, setReleaseBusy] = useState(false);
 
   const [epaOkrEmployeeId, setEpaOkrEmployeeId] = useState<string>('');
   const [epaOkrPeriod, setEpaOkrPeriod] = useState(defaultQuarterPeriod);
@@ -255,7 +242,7 @@ export default function AppraisalAdmin() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [resRes, ansRes, empRes, subRes, catRes, qRes, brRes, baRes, bfRes, bqRes, brelRes] = await Promise.all([
+      const [resRes, ansRes, empRes, subRes, catRes, qRes, brRes, baRes, bfRes, bqRes] = await Promise.all([
         supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
         supabase.from('survey_answers').select('*'),
         supabase.from('employees').select('*').order('name'),
@@ -266,10 +253,6 @@ export default function AppraisalAdmin() {
         supabase.from('assessment_answers').select('*'),
         supabase.from('assessment_forms').select('id, code, title'),
         supabase.from('assessment_questions').select('id, form_id, question_text'),
-        supabase
-          .from('assessment_period_releases')
-          .select('id, form_id, period, released_at, released_by, note, assessment_forms(code, title)')
-          .order('released_at', { ascending: false }),
       ]);
       if (resRes.data) setResponses(resRes.data);
       if (ansRes.data) setAnswers(ansRes.data);
@@ -281,7 +264,6 @@ export default function AppraisalAdmin() {
       if (baRes.data) setBoomAnswers(baRes.data as BoomAnswerRow[]);
       if (bfRes.data) setBoomForms(bfRes.data as BoomFormRow[]);
       if (bqRes.data) setBoomQuestions(bqRes.data as BoomQuestionRow[]);
-      if (brelRes.data) setBoomReleases(brelRes.data as BoomReleaseRow[]);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -339,55 +321,6 @@ export default function AppraisalAdmin() {
     el.download = `boom-assessments-${new Date().toISOString().slice(0, 10)}.csv`;
     el.click();
     URL.revokeObjectURL(url);
-  };
-
-  const peer360Periods = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of boomResponses) {
-      if (getBoomFormCode(r.form_id) === 'peer_360') s.add(r.period);
-    }
-    return [...s].sort().reverse();
-  }, [boomResponses, boomForms]);
-
-  const releasePeer360Results = async () => {
-    const p = releasePeriodInput.trim();
-    if (!p) {
-      toast.error('Enter a period key (e.g. 2026-Q1) matching responses.');
-      return;
-    }
-    setReleaseBusy(true);
-    try {
-      const { error } = await supabase.rpc('release_assessment_period', {
-        _form_code: 'peer_360',
-        _period: p,
-        _note: releaseNoteInput.trim() || null,
-      });
-      if (error) throw error;
-      toast.success(`Employees can now see aggregated 360 for ${p} (subject to minimum reviews).`);
-      setReleaseNoteInput('');
-      await loadAllData();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Release failed');
-    } finally {
-      setReleaseBusy(false);
-    }
-  };
-
-  const unreleasePeer360 = async (period: string) => {
-    setReleaseBusy(true);
-    try {
-      const { error } = await supabase.rpc('unrelease_assessment_period', {
-        _form_code: 'peer_360',
-        _period: period,
-      });
-      if (error) throw error;
-      toast.success(`Aggregate 360 hidden again for ${period}.`);
-      await loadAllData();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Revoke failed');
-    } finally {
-      setReleaseBusy(false);
-    }
   };
 
   const filteredResponses = useMemo(() => {
@@ -620,16 +553,16 @@ ${feedbackSample || '• No text feedback yet'}`;
         <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-xl">
           <div className="platform-canvas py-3 sm:py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/hub?tab=survey')} className="gap-1 flex-shrink-0 self-start sm:self-auto">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/hub?tab=survey')} className="h-9 flex-shrink-0 gap-1.5 self-start rounded-2xl font-sans text-sm font-medium normal-case tracking-normal sm:self-auto">
                 <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Hub</span>
               </Button>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold text-primary">{tenant.branding.shortName} Appraisal Monitor</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">{tenant.branding.fullName} completion, releases, and partner actions</p>
+                <h1 className="font-display text-xl font-semibold sm:text-2xl">{tenant.branding.shortName} appraisal monitor</h1>
+                <p className="hidden text-sm text-muted-foreground sm:block">{tenant.branding.fullName} completion and partner actions</p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-              <span className="text-xs">Sign Out</span>
+            <Button variant="ghost" size="sm" onClick={() => void handleLogout()} className="h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal">
+              Sign out
             </Button>
           </div>
         </header>
@@ -651,16 +584,16 @@ ${feedbackSample || '• No text feedback yet'}`;
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
         <div className="platform-canvas py-3 sm:py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate(boomMode ? '/hub?tab=survey' : '/dashboard')} className="gap-1 flex-shrink-0 self-start sm:self-auto">
+            <Button variant="ghost" size="sm" onClick={() => navigate(boomMode ? '/hub?tab=survey' : '/dashboard')} className="h-9 flex-shrink-0 gap-1.5 self-start rounded-2xl font-sans text-sm font-medium normal-case tracking-normal sm:self-auto">
               <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{boomMode ? 'Hub' : 'Dashboard'}</span><span className="sm:hidden">Back</span>
             </Button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-primary flex flex-wrap items-center gap-2">
-                <span className="truncate">{boomMode ? `${tenant.branding.shortName} Appraisal Monitor` : '360° Appraisal Monitor'}</span>
+              <h1 className="flex flex-wrap items-center gap-2 font-display text-xl font-semibold sm:text-2xl">
+                <span className="truncate">{boomMode ? `${tenant.branding.shortName} appraisal monitor` : 'Appraisal monitor'}</span>
                 {(boomMode ? boomSubmittedCount > 0 : totalResponses > 0) && (
-                  <Badge variant="secondary" className="text-[10px] gap-1 shrink-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Live
-                  </Badge>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[12px] font-medium normal-case tracking-normal text-emerald-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+                  </span>
                 )}
               </h1>
               <p className="text-xs text-muted-foreground hidden sm:block">
@@ -671,16 +604,16 @@ ${feedbackSample || '• No text feedback yet'}`;
             </div>
           </div>
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <Button variant="ghost" size="sm" onClick={loadAllData} className="gap-1">
-              <RefreshCw className="w-3 h-3" /> Refresh
+            <Button variant="ghost" size="sm" onClick={loadAllData} className="h-9 gap-1.5 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal">
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </Button>
             {ENABLE_APP_AI && (
-              <Button onClick={() => setChatOpen(true)} size="sm" className="gap-2 h-8 text-xs">
+              <Button onClick={() => setChatOpen(true)} size="sm" className="h-9 gap-2 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
                 <Brain className="w-3.5 h-3.5" /> Analytics assistant
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-              <span className="text-xs">Sign Out</span>
+            <Button variant="ghost" size="sm" onClick={() => void handleLogout()} className="h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal">
+              Sign out
             </Button>
           </div>
         </div>
@@ -730,12 +663,12 @@ ${feedbackSample || '• No text feedback yet'}`;
                 { label: 'Avg Score', value: `${avgOverallScore.toFixed(2)}/5`, icon: TrendingUp, color: 'bg-primary/10 text-primary' },
               ]
           ).map((stat, i) => (
-            <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="glass-panel p-4">
-              <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center mb-2`}>
-                <stat.icon className="w-4 h-4" />
+            <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+              <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-2xl ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
               </div>
-              <p className="text-xl font-bold">{stat.value}</p>
-              <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+              <p className="font-display text-2xl font-semibold">{stat.value}</p>
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
             </motion.div>
           ))}
         </div>
@@ -749,19 +682,19 @@ ${feedbackSample || '• No text feedback yet'}`;
                 ? `${tenant.branding.shortName} assessments appear here as people submit monthly self, peer 360, and manager/leadership forms.`
                 : 'Share the hub link for legacy subsidiary surveys, or complete BOOM assessments from the employee hub.'}
             </p>
-            <Button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/hub'); }} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/hub'); }} className="h-11 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
               Copy hub link
             </Button>
           </div>
         ) : (
           <Tabs value={adminTab} onValueChange={setAdminTab}>
             {!boomMode && (
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 min-h-11 h-auto gap-1 py-1">
-                  <TabsTrigger value="overview" className="text-xs gap-1.5"><BarChart3 className="w-3 h-3" /> Overview</TabsTrigger>
-                  <TabsTrigger value="people" className="text-xs gap-1.5"><Users className="w-3 h-3" /> People</TabsTrigger>
-                  <TabsTrigger value="trends" className="text-xs gap-1.5"><TrendingUp className="w-3 h-3" /> Trends</TabsTrigger>
-                  <TabsTrigger value="feed" className="text-xs gap-1.5"><Clock className="w-3 h-3" /> Live Feed</TabsTrigger>
-              <TabsTrigger value="boom" className="text-xs gap-1.5"><Layers className="w-3 h-3" /> BOOM</TabsTrigger>
+            <TabsList className="flex h-auto w-full flex-wrap gap-2 border-0 bg-transparent p-0">
+                  <TabsTrigger value="overview" className="gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
+                  <TabsTrigger value="people" className="gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white"><Users className="h-4 w-4" /> People</TabsTrigger>
+                  <TabsTrigger value="trends" className="gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white"><TrendingUp className="h-4 w-4" /> Trends</TabsTrigger>
+                  <TabsTrigger value="feed" className="gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white"><Clock className="h-4 w-4" /> Live feed</TabsTrigger>
+              <TabsTrigger value="boom" className="gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white"><Layers className="h-4 w-4" /> Reviews</TabsTrigger>
             </TabsList>
             )}
 
@@ -885,7 +818,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                           <td className="py-2.5 px-3 text-muted-foreground text-xs">{emp.department || '—'}</td>
                           <td className="py-2.5 px-3 text-muted-foreground text-xs">{emp.subsidiary}</td>
                           <td className="py-2.5 px-3 text-center">
-                            <Badge variant="secondary" className="text-[10px]">{emp.count}</Badge>
+                            <Badge variant="secondary" className="rounded-full font-sans text-[12px] font-medium normal-case tracking-normal">{emp.count}</Badge>
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center gap-1">
@@ -964,7 +897,7 @@ ${feedbackSample || '• No text feedback yet'}`;
               <div className="glass-panel p-5">
                 <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-accent" /> Recent Responses
-                  <Badge variant="secondary" className="text-[10px]">{filteredResponses.length} total</Badge>
+                  <Badge variant="secondary" className="rounded-full font-sans text-[12px] font-medium normal-case tracking-normal">{filteredResponses.length} total</Badge>
                 </h3>
                 <div className="space-y-2 max-h-[65vh] overflow-y-auto scrollbar-thin">
                   {filteredResponses.slice(0, 50).map(r => {
@@ -1037,105 +970,13 @@ ${feedbackSample || '• No text feedback yet'}`;
                     <Lock className="h-5 w-5 text-amber-700 dark:text-amber-400" />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <h3 className="text-sm font-semibold">HR release — peer 360 aggregates</h3>
+                    <h3 className="text-sm font-semibold">Peer 360 results</h3>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Until you release a quarter, employees do <strong>not</strong> see the &quot;My 360 results&quot; chart
-                      (raw peer rows were already hidden). Use the same period label as in responses (e.g.{' '}
-                      <span className="font-mono">2026-Q1</span>). Revoke removes the release if you need to pull results
-                      back.
+                      Aggregates are visible to everyone at the same time. There is no HR release step, and results
+                      cannot be held back for one person. Reviewer names stay off the employee view.
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Period</span>
-                    <Input
-                      placeholder="e.g. 2026-Q1"
-                      value={releasePeriodInput}
-                      onChange={(e) => setReleasePeriodInput(e.target.value)}
-                      className="h-9 text-sm font-mono"
-                    />
-                    {peer360Periods.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {peer360Periods.slice(0, 8).map((p) => (
-                          <Button
-                            key={p}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px] font-mono px-2"
-                            onClick={() => setReleasePeriodInput(p)}
-                          >
-                            {p}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Note (optional)</span>
-                    <Input
-                      placeholder="e.g. Approved by HR — pilot"
-                      value={releaseNoteInput}
-                      onChange={(e) => setReleaseNoteInput(e.target.value)}
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    className="h-9 gap-1.5 shrink-0"
-                    disabled={releaseBusy}
-                    onClick={() => void releasePeer360Results()}
-                  >
-                    <Unlock className="w-3.5 h-3.5" /> Release aggregates
-                  </Button>
-                </div>
-                {boomReleases.length > 0 && (
-                  <div className="mt-5 pt-4 border-t border-border/60">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Active releases</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-left text-muted-foreground border-b border-border/50">
-                            <th className="pb-2 pr-3 font-medium">Form</th>
-                            <th className="pb-2 pr-3 font-medium">Period</th>
-                            <th className="pb-2 pr-3 font-medium">Released</th>
-                            <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Note</th>
-                            <th className="pb-2 font-medium text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {boomReleases.map((row) => (
-                            <tr key={row.id} className="border-b border-border/30">
-                              <td className="py-2 pr-3 font-mono">{row.assessment_forms?.code ?? '—'}</td>
-                              <td className="py-2 pr-3 font-mono">{row.period}</td>
-                              <td className="py-2 pr-3 text-muted-foreground">
-                                {new Date(row.released_at).toLocaleString()}
-                              </td>
-                              <td className="py-2 pr-3 hidden sm:table-cell text-muted-foreground max-w-[200px] truncate">
-                                {row.note ?? '—'}
-                              </td>
-                              <td className="py-2 text-right">
-                                {(row.assessment_forms?.code === 'peer_360') && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-[10px] text-destructive"
-                                    disabled={releaseBusy}
-                                    onClick={() => void unreleasePeer360(row.period)}
-                                  >
-                                    Revoke
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </div>
               )}
 
@@ -1157,7 +998,7 @@ ${feedbackSample || '• No text feedback yet'}`;
 
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">OKR text (4 slots)</p>
+                    <p className="text-sm font-medium text-foreground/70">OKR text (4 slots)</p>
                     <div className="flex flex-col gap-2">
                       <span className="text-[10px] text-muted-foreground">Executive</span>
                       <Select value={epaOkrEmployeeId || '__'} onValueChange={(v) => setEpaOkrEmployeeId(v === '__' ? '' : v)}>
@@ -1227,7 +1068,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                     <Button
                       type="button"
                       size="sm"
-                      className="w-full h-9"
+                      className="h-10 w-full rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600"
                       disabled={epaOkrBusy || !epaOkrEmployeeId}
                       onClick={() => void saveEpaOkrs()}
                     >
@@ -1236,7 +1077,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                   </div>
 
                   <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Formal gate decision</p>
+                    <p className="text-sm font-medium text-foreground/70">Formal gate decision</p>
                     <div className="flex flex-col gap-2">
                       <span className="text-[10px] text-muted-foreground">Executive</span>
                       <Select value={gateEmployeeId || '__'} onValueChange={(v) => setGateEmployeeId(v === '__' ? '' : v)}>
@@ -1301,7 +1142,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                     <Button
                       type="button"
                       size="sm"
-                      className="w-full h-9"
+                      className="h-10 w-full rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600"
                       disabled={gateBusy || !gateEmployeeId}
                       onClick={() => void saveGateDecision()}
                     >
@@ -1336,7 +1177,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportBoomCsv} disabled={filteredBoomResponses.length === 0}>
+                  <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal" onClick={exportBoomCsv} disabled={filteredBoomResponses.length === 0}>
                     <Download className="w-3.5 h-3.5" /> Export CSV
                   </Button>
                 </div>
@@ -1371,7 +1212,7 @@ ${feedbackSample || '• No text feedback yet'}`;
                               <td className="py-2.5 px-3">{getEmployeeName(r.reviewer_id)}</td>
                               <td className="py-2.5 px-3">{getEmployeeName(r.reviewee_id)}</td>
                               <td className="py-2.5 px-3">
-                                <Badge variant={r.status === 'submitted' ? 'default' : 'secondary'} className="text-[10px]">
+                                <Badge variant={r.status === 'submitted' ? 'default' : 'secondary'} className="rounded-full font-sans text-[12px] font-medium normal-case tracking-normal">
                                   {r.status}
                                 </Badge>
                               </td>

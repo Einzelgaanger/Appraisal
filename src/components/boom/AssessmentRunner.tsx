@@ -285,7 +285,7 @@ export default function AssessmentRunner({
 
   const buildAnswerRows = useCallback(() => {
     if (!responseId) return [];
-    const scoredCommentsEnabled = formCode === 'peer_360' || formCode === 'ea_quarterly';
+    const scoredCommentsEnabled = formCode === 'peer_360' || formCode === 'ea_quarterly' || formCode === 'monthly_self';
     const out: { question_id: string; score: number | null; text_answer: string | null; no_opportunity: boolean }[] = [];
     for (const q of visibleQuestions) {
       const d = draft[q.id] ?? {};
@@ -308,13 +308,17 @@ export default function AssessmentRunner({
   }, [draft, formCode, responseId, visibleQuestions]);
 
   const handleSaveDraft = async () => {
-    if (!responseId || responseStatus !== 'draft') return;
+    if (!responseId || responseStatus !== 'draft') {
+      toast.error(responseStatus === 'submitted' ? 'This check-in is already submitted.' : 'The form is still opening. Wait a moment, then save again.');
+      return;
+    }
     setSaving(true);
     try {
       await persistAnswers(buildAnswerRows());
-      toast.success('Saved');
+      toast.success('Draft saved');
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Save failed');
+      const message = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : '');
+      toast.error(message || 'Could not save the draft');
     } finally {
       setSaving(false);
     }
@@ -347,7 +351,10 @@ export default function AssessmentRunner({
   };
 
   const handleSubmit = async () => {
-    if (!responseId || responseStatus !== 'draft') return;
+    if (!responseId || responseStatus !== 'draft') {
+      toast.error(responseStatus === 'submitted' ? 'This check-in is already submitted.' : 'The form is still opening. Wait a moment, then submit again.');
+      return;
+    }
     const err = validate();
     if (err) {
       toast.error(err);
@@ -367,7 +374,8 @@ export default function AssessmentRunner({
       onCompleted?.();
       onOpenChange(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Submit failed');
+      const message = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : '');
+      toast.error(message || 'Could not submit the check-in');
     } finally {
       setSubmitting(false);
     }
@@ -383,7 +391,7 @@ export default function AssessmentRunner({
   const readOnly = responseStatus === 'submitted';
 
   const usesBoomScale = formCode === 'executive' || formCode === 'ea_quarterly' || formCode === 'peer_360';
-  const scoredCommentsEnabled = formCode === 'peer_360' || formCode === 'ea_quarterly';
+  const scoredCommentsEnabled = formCode === 'peer_360' || formCode === 'ea_quarterly' || formCode === 'monthly_self';
   const activeScale = usesBoomScale ? BOOM_SCALE_BUTTONS : MONTHLY_LIKERT_SCALE;
 
   const totalVisible = visibleQuestions.length;
@@ -552,7 +560,9 @@ export default function AssessmentRunner({
                               placeholder={
                                 formCode === 'peer_360'
                                   ? 'Optional comment — add context for this rating (anonymous to reviewee).'
-                                  : 'Optional comment — add context for this rating.'
+                                  : formCode === 'monthly_self'
+                                    ? 'Comment for this question'
+                                    : 'Optional comment — add context for this rating.'
                               }
                             />
                           )}

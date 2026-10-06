@@ -15,6 +15,7 @@ import {
   lookupSignedInCompanySlug,
   lookupTenantSlugForEmail,
 } from '@/tenants/companyHome';
+import { resolveLoginEmail } from '@/lib/loginEmail';
 
 export default function EmployeeLogin() {
   const { tenant } = useTenant();
@@ -66,15 +67,21 @@ export default function EmployeeLogin() {
     setSubmitTick((t) => t + 1);
     setLoading(true);
     try {
-      const { error } = await login(email, password);
-      if (error) setError(error);
-      else {
+      const loginEmail = await resolveLoginEmail(email);
+      const { error } = await login(loginEmail, password);
+      if (error) {
+        setError(
+          loginEmail.toLowerCase() !== email.trim().toLowerCase()
+            ? `That address now signs in as ${loginEmail}. The password was not accepted.`
+            : error,
+        );
+      } else {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           setError('Sign-in succeeded but the session was not saved. Check that cookies/storage are allowed and try again.');
           return;
         }
-        window.location.assign(await resolveAfterLogin(email));
+        window.location.assign(await resolveAfterLogin(loginEmail));
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -99,12 +106,10 @@ export default function EmployeeLogin() {
 
         <div className="mobile-flow-header mobile-top-safe border-b border-foreground/10">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-1.5 -ml-2 h-9">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="h-9 gap-1.5 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal">
               <ArrowLeft className="h-4 w-4" /> Home
             </Button>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/50">
-              Employee / 02
-            </span>
+            <span className="text-sm text-muted-foreground">Employee sign in</span>
           </div>
         </div>
 
@@ -141,8 +146,8 @@ export default function EmployeeLogin() {
               ) : null}
 
               <div className="mb-6 sm:mb-8">
-                <h1 className="font-serif text-[1.65rem] font-semibold leading-[1.0] tracking-[-0.02em] sm:text-[2.35rem] sm:leading-[0.98]">
-                  Welcome back.
+                <h1 className="font-display text-[1.75rem] font-semibold leading-tight sm:text-4xl">
+                  Welcome back
                 </h1>
                 <p className="mt-2 text-[13px] leading-relaxed text-foreground/60 sm:text-sm">
                   Sign in with your work email.
@@ -151,7 +156,7 @@ export default function EmployeeLogin() {
 
               <form id="employee-login-form" onSubmit={handleSubmit} className="mobile-flow-card space-y-4.5 sm:space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70">
+                  <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
                     Email
                   </Label>
                   <div className="relative">
@@ -162,7 +167,7 @@ export default function EmployeeLogin() {
                       placeholder="you@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-11 pl-10 rounded-lg border-foreground/20 bg-background text-sm sm:rounded-sm"
+                      className="h-11 rounded-2xl border-foreground/15 bg-background pl-10 text-sm"
                       inputMode="email"
                       autoComplete="username"
                       required
@@ -171,7 +176,7 @@ export default function EmployeeLogin() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70">
+                  <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
                     Password
                   </Label>
                   <div className="relative">
@@ -182,7 +187,7 @@ export default function EmployeeLogin() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 pl-10 pr-11 rounded-lg border-foreground/20 bg-background text-sm sm:rounded-sm"
+                      className="h-11 rounded-2xl border-foreground/15 bg-background pl-10 pr-11 text-sm"
                       autoComplete="current-password"
                       required
                     />
@@ -216,7 +221,7 @@ export default function EmployeeLogin() {
                 )}
 
                 <div className="hidden lg:block">
-                  <Button type="submit" disabled={loading} className="h-10 w-full gap-2 text-sm font-semibold transition-transform active:scale-[0.98]">
+                  <Button type="submit" disabled={loading} className="h-11 w-full gap-2 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
                     {loading ? (
                       <span className="flex items-center gap-2">
                         <motion.span
@@ -228,7 +233,7 @@ export default function EmployeeLogin() {
                       </span>
                     ) : (
                       <>
-                        Sign In <ArrowRight className="h-4 w-4" />
+                        Sign in <ArrowRight className="h-4 w-4" />
                       </>
                     )}
                   </Button>
@@ -238,7 +243,7 @@ export default function EmployeeLogin() {
               <div className="mt-5 border-t border-foreground/10 px-1 pt-4 sm:mt-7 lg:mt-9">
                 <Link
                   to={findAccountLink()}
-                  className="inline-flex min-h-10 items-center font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70 hover:text-foreground"
+                  className="inline-flex min-h-10 items-center text-sm font-medium text-foreground/80 hover:text-foreground"
                 >
                   First time? → Find your account
                 </Link>
@@ -250,7 +255,7 @@ export default function EmployeeLogin() {
                 type="submit"
                 form="employee-login-form"
                 disabled={loading}
-                className="h-10 w-full gap-2 rounded-lg text-sm font-semibold shadow-sm active:scale-[0.98] sm:rounded-sm"
+                className="h-11 w-full gap-2 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -263,7 +268,7 @@ export default function EmployeeLogin() {
                   </span>
                 ) : (
                   <>
-                    Sign In <ArrowRight className="h-4 w-4" />
+                    Sign in <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </Button>

@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployeeAuth } from '@/contexts/EmployeeAuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveLoginEmail } from '@/lib/loginEmail';
+import { companyWorkspaceUrl, lookupSignedInCompanySlug } from '@/tenants/companyHome';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,9 +48,14 @@ export default function Login() {
         }
       }
 
-      const { error: signInErr } = await employeeLogin(email, password);
+      const loginEmail = await resolveLoginEmail(email);
+      const { error: signInErr } = await employeeLogin(loginEmail, password);
       if (signInErr) {
-        setError('Invalid credentials. Please try again.');
+        setError(
+          loginEmail.toLowerCase() !== email.trim().toLowerCase()
+            ? `That address now signs in as ${loginEmail}. The password was not accepted.`
+            : 'Invalid credentials. Please try again.',
+        );
         return;
       }
 
@@ -68,10 +75,9 @@ export default function Login() {
         .maybeSingle();
 
       if (!adminRole) {
-        await supabase.auth.signOut();
-        setError(
-          'Your employee account signed in, but it does not have administrator access. Ask a platform owner to grant the admin role for your user.',
-        );
+        await refreshProfile();
+        const slug = await lookupSignedInCompanySlug();
+        window.location.assign(slug ? companyWorkspaceUrl(slug, '/hub?tab=survey') : '/hub?tab=survey');
         return;
       }
 
@@ -100,20 +106,16 @@ export default function Login() {
 
         <div className="mobile-flow-header mobile-top-safe border-b border-foreground/10">
           <div className="flex items-center justify-between lg:hidden">
-            <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 h-9 text-muted-foreground" asChild>
+            <Button variant="ghost" size="sm" className="h-9 gap-1.5 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal text-muted-foreground" asChild>
               <Link to="/">
                 <ArrowLeft className="h-4 w-4" /> Home
               </Link>
             </Button>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/50">Admin / 01</span>
+            <span className="text-sm text-muted-foreground">Admin sign in</span>
           </div>
           <div className="hidden lg:flex items-center justify-between">
-            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-foreground/70">
-              Restricted Access
-            </span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/50">
-              Authentication / 01
-            </span>
+            <span className="text-sm font-medium text-foreground/80">Restricted access</span>
+            <span className="text-sm text-muted-foreground">Admin sign in</span>
           </div>
         </div>
 
@@ -128,11 +130,11 @@ export default function Login() {
               <img src={vggLogo} alt="Venture Garden Group" className="h-6 w-auto mb-6 sm:mb-8" />
 
               <div className="mb-6 sm:mb-8">
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-foreground/60">
+                <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-800">
                   Administrator
                 </span>
-                <h1 className="mt-2.5 font-serif text-[1.75rem] font-semibold leading-[0.98] tracking-[-0.02em] sm:text-[2.5rem]">
-                  Sign in.
+                <h1 className="mt-3 font-display text-[1.75rem] font-semibold leading-tight sm:text-4xl">
+                  Sign in
                 </h1>
                 <p className="mt-2 text-[13px] text-foreground/60 sm:text-sm">
                   VGG 360° Performance Analytics console.
@@ -141,7 +143,7 @@ export default function Login() {
 
               <form id="admin-login-form" onSubmit={handleSubmit} className="mobile-flow-card space-y-4.5 sm:space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70">
+                  <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
                     Email
                   </Label>
                   <div className="relative">
@@ -152,7 +154,7 @@ export default function Login() {
                       placeholder="admin@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-11 pl-10 rounded-lg border-foreground/20 bg-background text-sm sm:rounded-sm"
+                      className="h-11 rounded-2xl border-foreground/15 bg-background pl-10 text-sm"
                       inputMode="email"
                       autoComplete="username"
                       required
@@ -161,7 +163,7 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="font-mono text-[9px] uppercase tracking-[0.16em] text-foreground/70">
+                  <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
                     Password
                   </Label>
                   <div className="relative">
@@ -172,7 +174,7 @@ export default function Login() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 pl-10 pr-11 rounded-lg border-foreground/20 bg-background text-sm sm:rounded-sm"
+                      className="h-11 rounded-2xl border-foreground/15 bg-background pl-10 pr-11 text-sm"
                       autoComplete="current-password"
                       required
                     />
@@ -208,7 +210,7 @@ export default function Login() {
                 )}
 
                 <div className="hidden pb-1 lg:block">
-                  <Button type="submit" disabled={loading} className="h-10 w-full gap-2 text-sm font-semibold transition-transform active:scale-[0.98]">
+                  <Button type="submit" disabled={loading} className="h-11 w-full gap-2 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600">
                     {loading ? (
                       <span className="flex items-center gap-2">
                         <motion.span
@@ -220,14 +222,14 @@ export default function Login() {
                       </span>
                     ) : (
                       <>
-                        Enter Console <ArrowRight className="h-4 w-4" />
+                        Enter console <ArrowRight className="h-4 w-4" />
                       </>
                     )}
                   </Button>
                 </div>
               </form>
 
-              <p className="mt-3 px-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="mt-3 px-1 text-sm text-muted-foreground">
                 Protected administrator channel. Contact platform owner if access fails.
               </p>
             </div>
@@ -237,7 +239,7 @@ export default function Login() {
                 type="submit"
                 form="admin-login-form"
                 disabled={loading}
-                className="h-10 w-full gap-2 rounded-lg text-sm font-semibold shadow-sm active:scale-[0.98] sm:rounded-sm"
+                className="h-11 w-full gap-2 rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-teal-600"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -250,7 +252,7 @@ export default function Login() {
                   </span>
                 ) : (
                   <>
-                    Enter Console <ArrowRight className="h-4 w-4" />
+                    Enter console <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </Button>

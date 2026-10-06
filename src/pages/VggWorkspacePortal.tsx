@@ -45,7 +45,7 @@ function CompanyLockup({
           </span>
         </div>
       )}
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{host}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{host}</p>
     </div>
   );
 }
@@ -76,10 +76,8 @@ export default function VggWorkspacePortal() {
             <img src={vggLogo} alt="Venture Garden Group" className="h-7 w-auto sm:h-8" />
             <div className="hidden h-6 w-px bg-border sm:block" />
             <div className="hidden sm:block">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                {PRODUCTION_BASE_DOMAIN}
-              </p>
-              <p className="text-[11px] font-medium text-foreground/90">Group workspace portal</p>
+              <p className="text-sm text-muted-foreground">{PRODUCTION_BASE_DOMAIN}</p>
+              <p className="text-sm font-medium text-foreground/90">Group portal</p>
             </div>
           </div>
         </header>
@@ -89,7 +87,7 @@ export default function VggWorkspacePortal() {
           className="relative z-[2] shrink-0 border-t border-border/60 bg-card/40 px-4 py-2 text-center backdrop-blur-md"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
-          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground sm:text-[10px]">
+          <span className="text-sm text-muted-foreground">
             © Venture Garden Group ·{' '}
             <a href={apexOrigin} className="text-primary/90 hover:text-primary">
               {PRODUCTION_BASE_DOMAIN}

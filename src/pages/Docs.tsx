@@ -31,7 +31,7 @@ const SECTIONS: Section[] = [
         <ul>
           <li>
             <strong>Performance.</strong> Company-specific review cycles. Executive Team uses BOOM (monthly self,
-            full-roster anonymous 360, EA quarterly manager reviews, executive self-assessment, EPA assessors).
+            full-roster anonymous 360, Executive Office Quarterly Evaluation, executive self-assessment, EPA assessors).
             GreenHouse Capital and VigiPay use the GHC-style cycle (monthly self check-in, monthly manager review,
             quarterly peer 360, formal quarterly evaluation, acknowledgement, and discussion).
           </li>
@@ -41,9 +41,9 @@ const SECTIONS: Section[] = [
             only after the recipient accepts.
           </li>
           <li>
-            <strong>Leave planner.</strong> Quarterly annual leave of 10 working days, split into blocks, with a
-            submission window, a blackout at the start and end of the quarter, one person per department on leave
-            at a time, and a two-step approval: line manager, then HR.
+            <strong>Leave planner.</strong> Each leave type has its own balance. Annual leave is 10 working days a
+            quarter, with a submission window and a blackout at the start and end of the quarter. One person per
+            department can be on leave at a time. Every request goes to HR first, then to the line manager.
           </li>
           <li>
             <strong>Profile.</strong> A person can update their name, role, department, and photo. Email and company
@@ -217,7 +217,7 @@ const SECTIONS: Section[] = [
         <h3>What each level sees</h3>
         <ul>
           <li>Hierarchy uses lower-is-senior: 0 is top leadership, 1 is a functional lead, 2 and above are team. <code>subsidiaries.hierarchy_lower_is_senior</code> selects this convention.</li>
-          <li>Team members (level 2 and above) primarily see Tasks: monthly self, peer 360 on the full roster, and EA quarterly only if they are a configured line manager.</li>
+          <li>Team members (level 2 and above) primarily see Tasks: monthly self, peer 360 on the full roster, and the Executive Office Quarterly Evaluation only if they are a configured line manager.</li>
           <li>Level 0 and 1 also get Directory, Insights, and discussion facilitation, scoped by hierarchy and pod rules.</li>
           <li>Peer forms hide executive-only question sections from people below that lens. Manager and executive reviewers see those extra sections.</li>
         </ul>
@@ -232,7 +232,7 @@ const SECTIONS: Section[] = [
         </ul>
         <h3>Discussions</h3>
         <p>
-          After a submission, a thread can open between the subject and a facilitator. Monthly self, EA quarterly,
+          After a submission, a thread can open between the subject and a facilitator. Monthly self, the Executive Office Quarterly Evaluation,
           and peer 360 oversight each have their own discussion path. The subject never receives a name for a 360
           reviewer through that thread.
         </p>
@@ -240,7 +240,7 @@ const SECTIONS: Section[] = [
         <ul>
           <li>Answers auto-save as a draft. Submit is explicit and moves the response to <code>submitted</code>.</li>
           <li>Peer 360 allows “no opportunity to observe” on items where that is valid. Those answers are excluded from aggregates.</li>
-          <li>EA quarterly uses a performance scale and does not impose a minimum word count.</li>
+          <li>The Executive Office Quarterly Evaluation (<code>ea_quarterly</code>) uses a performance scale and does not impose a minimum word count.</li>
           <li>Status for a reviewer’s pass through a form in a period is also recorded on <code>review_completions</code>.</li>
         </ul>
       </>
@@ -317,7 +317,7 @@ const SECTIONS: Section[] = [
         <ul>
           <li>Peers write named rows in the database (the system must know who drafted and who submitted).</li>
           <li>The employee sees aggregates, not names.</li>
-          <li>HR holds release. Until peer 360 is released for the quarter, the employee-facing result stays closed. Company admins release from the HR Monitor.</li>
+          <li>There is no HR release step. Anonymous aggregates open for every employee at the same time, as soon as peers have submitted.</li>
           <li>HR Monitor can show named feedback to People Ops. That view is not the employee view.</li>
           <li>Small groups still suppress direction labels when fewer than three reviewers share a direction, for the same reason as BOOM.</li>
         </ul>
@@ -331,7 +331,8 @@ const SECTIONS: Section[] = [
         <p>GHC teams used on profile completion: Investment, Legal, People Ops, Comms, Operations, Finance.</p>
         <p>
           GHC job titles used on profile completion: Intern, Analyst, Associate, Senior Associate, Manager,
-          Investment Lead, Finance Lead, People Manager, Head of Legal, Partner, Managing Partner.
+          Investment Lead, Finance Lead, People Manager, Head of Legal, Head of Operations, Head of Legal
+          &amp; Operations, Partner, Managing Partner. A person can also cover more than one team.
         </p>
         <p>
           GHC seniority labels: 1 Manager, 2 Line manager, 3 Team member. Lower numbers are more senior. VigiPay
@@ -360,22 +361,23 @@ const SECTIONS: Section[] = [
         </p>
         <h3>Allowance</h3>
         <ul>
-          <li>10 working days per quarter. Monday to Friday count. Saturday and Sunday do not.</li>
-          <li>The quarter is derived from the start date. A block must start and end inside the same quarter. A holiday that crosses a quarter boundary is two requests.</li>
-          <li>Pending, manager-approved, and approved days all count against the balance, so a person cannot stack overlapping requests to exceed 10.</li>
-          <li>Declined and cancelled requests do not count.</li>
-          <li>The balance card shows the period (<code>YYYY-Qn</code>), allowance, used, and remaining.</li>
+          <li>Each type stands alone. Annual 10, sick 10, compassionate 5, parental 10, study 10, unpaid 15, and other 5 working days per quarter. Maternity is 90 working days in the calendar year and may cross a quarter.</li>
+          <li>Monday to Friday count. Saturday and Sunday do not.</li>
+          <li>Except maternity, a block must start and end inside the same quarter. A holiday that crosses a quarter boundary is two requests.</li>
+          <li>Pending, HR-cleared, older manager-approved, and approved days all count against that type’s balance.</li>
+          <li>Declined and cancelled requests do not count. Using annual leave does not reduce sick, compassionate, or any other type.</li>
+          <li>The balance card shows the selected type’s allowance, used days, and remaining days.</li>
         </ul>
-        <h3>When leave may fall</h3>
+        <h3>When annual leave may fall</h3>
         <ul>
-          <li>No leave in the first 14 days of the quarter, and none in the last 14 days. If the quarter starts on date Q, allowed dates run from Q+14 through (quarter end − 14).</li>
-          <li>Requests for the quarter must be submitted by the end of week 2, which is Q+13. After that date the request form is closed for employees.</li>
-          <li>HR can still place or reschedule remaining days after the deadline. In the leave form, HR chooses the person, or uses Move on an existing request. That writes the block as approved. The date, quarter, and department checks still run. The week-2 deadline is the only rule HR can pass.</li>
+          <li>Annual leave cannot fall in the first 14 days of the quarter, or in the last 14 days. If the quarter starts on date Q, allowed dates run from Q+14 through (quarter end − 14).</li>
+          <li>Annual leave for the quarter must be submitted by the end of week 2, which is Q+13. After that date an employee cannot submit annual leave. Sick and the other types stay open.</li>
+          <li>HR can still place or reschedule after the annual deadline. HR chooses the person, or uses Move on an existing request. A new placement is cleared by HR and then waits for the line manager, unless HR is also that manager or there is no separate manager. The date, quarter, and department checks still run. The week-2 deadline is the only rule HR can pass, and only for annual leave.</li>
         </ul>
         <h3>Department rule</h3>
         <p>
-          Only one person in a department may hold active leave on a given date. “Active” means pending,
-          manager-approved, or approved. The check compares <code>employees.department</code> case-insensitively
+          Only one person in a department may hold active leave on a given date. “Active” means waiting for HR,
+          waiting for the manager, older manager-approved, or approved. The check compares <code>employees.department</code> case-insensitively
           inside the same subsidiary. If someone else in the department already covers any day of the requested
           range, the request is rejected and names that person. People with a blank department are treated as the
           same unnamed department, so an empty team still cannot double-book.
@@ -386,27 +388,28 @@ const SECTIONS: Section[] = [
         </p>
         <h3>Leave types</h3>
         <p>
-          Annual, compassionate, maternity, study, sick, unpaid, parental, and other. The type is recorded on the
-          request. The 10-day quarterly cap and the blackout window apply to every type through the same assert
-          function.
+          Annual, compassionate, maternity, study, sick, unpaid, parental, and other. Each type has its own allowance.
+          Annual leave is 10 working days a quarter, with the blackout window and the week-2 deadline. The other types
+          do not draw from that annual balance.
         </p>
         <h3>Approval chain</h3>
         <table>
           <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
           <tbody>
-            <tr><td><code>pending</code></td><td>Waiting for the line manager. This is the normal starting status.</td></tr>
-            <tr><td><code>manager_approved</code></td><td>Line manager has approved. Waiting for HR. Also the starting status when the person has no line manager, or the line manager is themselves.</td></tr>
-            <tr><td><code>approved</code></td><td>HR has given final approval. If the same person is both the line manager and HR, one approval can move a pending request straight here.</td></tr>
+            <tr><td><code>pending</code></td><td>Waiting for HR. HR is told by email and the request is on the leave planner.</td></tr>
+            <tr><td><code>hr_approved</code></td><td>HR has cleared it. Waiting for the line manager.</td></tr>
+            <tr><td><code>manager_approved</code></td><td>Older requests that the line manager already approved. HR can still finish these.</td></tr>
+            <tr><td><code>approved</code></td><td>HR cleared it and the line manager approved it. If there is no separate line manager, HR approval is final.</td></tr>
             <tr><td><code>declined</code></td><td>Line manager or HR declined. Terminal.</td></tr>
             <tr><td><code>cancelled</code></td><td>The employee cancelled their own request. Hidden from the shared list.</td></tr>
           </tbody>
         </table>
         <ul>
           <li>The line manager is <code>ghc_manager_id</code> if set, otherwise <code>manager_id</code>.</li>
-          <li>Only that line manager, or HR, can approve or decline. HR cannot skip a real line manager: a pending request with a distinct manager stays pending until the manager acts.</li>
+          <li>HR acts first. The line manager acts only after HR has cleared the request. A pending request does not go to the manager before that.</li>
           <li>HR is anyone with <code>employees.company_admin</code> on the active row, or a platform <code>admin</code> role.</li>
           <li>Final approval re-checks the date rules (including department conflicts) so a request that became invalid while it waited cannot be approved.</li>
-          <li>The employee may cancel their own pending, manager-approved, or approved leave. They cannot cancel someone else’s.</li>
+          <li>The employee may cancel their own request while it is with HR, with the manager, or already approved. They cannot cancel someone else’s.</li>
         </ul>
         <h3>Who sees which rows</h3>
         <p>
@@ -553,8 +556,8 @@ const SECTIONS: Section[] = [
           the person can act as:
         </p>
         <ul>
-          <li>GHC-style companies: roster size, monthly self submitted versus still open, peer 360 submitted versus expected, evaluations submitted, evaluations acknowledged, and whether peer 360 has been released.</li>
-          <li>Executive Team: roster size, peer 360 submitted versus expected, and whether 360 results are released.</li>
+          <li>GHC-style companies: roster size, monthly self submitted versus still open, peer 360 submitted versus expected, evaluations submitted, and evaluations acknowledged. Peer 360 results are visible to everyone together.</li>
+          <li>Executive Team: roster size and peer 360 submitted versus expected. Aggregates are visible as soon as peers submit.</li>
         </ul>
         <p>
           Opening a company from that list switches the active employee if needed, then navigates to that
@@ -592,16 +595,16 @@ const SECTIONS: Section[] = [
             <tr><td><code>assessment_responses</code></td><td>One row per form, reviewer, reviewee, and period. Status <code>todo</code>, <code>draft</code>, or <code>submitted</code>.</td></tr>
             <tr><td><code>assessment_answers</code></td><td>Score (typically 1–5) and/or text, plus a no-opportunity flag.</td></tr>
             <tr><td><code>assessment_peer_comments</code></td><td>Anonymous downward narrative comments.</td></tr>
-            <tr><td><code>eo_ea_quarterly_pairs</code></td><td>Explicit line-manager to report pairs for EA quarterly.</td></tr>
+            <tr><td><code>eo_ea_quarterly_pairs</code></td><td>Explicit line-manager to report pairs for the Executive Office Quarterly Evaluation (<code>ea_quarterly</code>).</td></tr>
             <tr><td><code>review_completions</code></td><td>Marks a reviewer’s pass through a form as complete for a period.</td></tr>
           </tbody>
         </table>
         <h3>GHC-style reviews</h3>
         <p>
-          GHC and VigiPay tasks, 360 responses, quarterly evaluations, acknowledgements, discussions, and release
-          flags live in the <code>ghc_*</code> tables and are read through <code>ghc_*</code> RPCs. The employee
-          never selects those tables for a scored result. HR release is a column/timestamp the monitor sets; until
-          it is set, employee-facing 360 stays closed.
+          GHC and VigiPay tasks, 360 responses, quarterly evaluations, acknowledgements, and discussions
+          live in the <code>ghc_*</code> tables and are read through <code>ghc_*</code> RPCs. The employee
+          never selects those tables for a scored result. Anonymous 360 aggregates are visible to every employee
+          at the same time. Reviewer names stay with People Ops.
         </p>
         <h3>Workspace</h3>
         <p>
@@ -803,9 +806,9 @@ GRANT EXECUTE ON FUNCTION public.<rpc>(...) TO authenticated;`}</code></pre>
             <tr><td>Roster <code>employees</code></td><td>Admin import and provisioning for that company</td><td>Ad hoc. Leavers are deactivated.</td><td>Reads needed to run the company. Writes: admin, plus self-service profile fields.</td></tr>
             <tr><td>Logins <code>profiles</code> / <code>employee_access</code></td><td>Provisioning, first-login completion, company switch</td><td>Ad hoc</td><td>Self. Grants are not client-writable.</td></tr>
             <tr><td>BOOM assessments</td><td>Reviewer in the hub (draft, then submit)</td><td>Monthly self; quarterly 360, EPA, EA, executive</td><td>Reviewer: own rows. Reviewee: aggregated RPCs only. Admin: monitor and export.</td></tr>
-            <tr><td>GHC-style reviews</td><td>Same pattern, GHC task runners</td><td>Monthly self and manager review; quarterly 360 and evaluation</td><td>Reviewer: own tasks. Employee: own results after the rules for that form (360 waits for HR release). HR: monitor, including named 360.</td></tr>
+            <tr><td>GHC-style reviews</td><td>Same pattern, GHC task runners</td><td>Monthly self and manager review; quarterly 360 and evaluation</td><td>Reviewer: own tasks. Employee: own results, including anonymous 360 as soon as peers submit. HR: monitor, including named 360.</td></tr>
             <tr><td>Projects and tasks</td><td>Members in the projects tab</td><td>As work happens</td><td>Members of that project, in that company.</td></tr>
-            <tr><td>Leave</td><td>Employee request; manager and HR decision</td><td>Quarterly planning window, then approvals</td><td>Company leave list for signed-in colleagues of that company. Decisions only by the line manager or HR.</td></tr>
+            <tr><td>Leave</td><td>Employee request; HR, then the line manager</td><td>Each type has its own balance. Annual leave uses the quarterly window.</td><td>Company leave list for signed-in colleagues of that company. HR decides first. The line manager decides after HR.</td></tr>
             <tr><td>Avatars</td><td>Profile upload</td><td>Ad hoc</td><td>Public read of the image file. Path is tied to the auth user.</td></tr>
             <tr><td>Email metadata</td><td>Queue at send time</td><td>Per message</td><td>Service role. Bodies are not stored.</td></tr>
             <tr><td>AI context</td><td>Assembled per request on the server</td><td>On demand</td><td>Sent to Anthropic or Perplexity. Not written back to assessment tables. No reviewer identity for peer 360.</td></tr>
@@ -1037,17 +1040,16 @@ npm run supabase:deploy    # migrations, functions, and secrets`}</code></pre>
         </p>
         <h3>GHC or VigiPay 360 looks empty for the employee</h3>
         <p>
-          Check whether HR has released peer 360 for that quarter. Submitted reviews can exist in the HR Monitor
-          while the employee view stays closed until release. Also confirm the employee’s active company is the
-          one the reviews were written in.
+          Confirm at least one submitted peer 360 exists for that person and quarter. Results are not held for an HR
+          release. Also confirm the employee’s active company is the one the reviews were written in.
         </p>
         <h3>Leave request is rejected</h3>
         <ul>
           <li>The dates include a weekend only, or the end is before the start.</li>
-          <li>The block crosses a quarter, or it touches the first or last two weeks.</li>
-          <li>Today is after the week-2 deadline and the caller is not HR.</li>
+          <li>For annual leave, the block crosses a quarter, or it touches the first or last two weeks.</li>
+          <li>For annual leave, today is after the week-2 deadline and the caller is not HR. Other types stay open.</li>
           <li>The person, or someone else in the same department, already has active leave on those dates.</li>
-          <li>The block would push the quarter over 10 working days, counting pending and approved requests.</li>
+          <li>The block would push that leave type over its own allowance, counting requests that are with HR, with the manager, or approved.</li>
         </ul>
         <h3>Adding a person to a second company</h3>
         <p>
@@ -1110,7 +1112,7 @@ npm run supabase:deploy    # migrations, functions, and secrets`}</code></pre>
           <tr><td>360</td><td>Multi-rater peer review. Recipients see aggregates. Names stay off the recipient views.</td></tr>
           <tr><td>Release</td><td>On GHC and VigiPay, the HR action that opens quarterly 360 results to employees.</td></tr>
           <tr><td>EPA</td><td>Executive Performance Assessment add-on on Executive Team.</td></tr>
-          <tr><td>EA quarterly</td><td>Executive Team manager review of a named report, driven by an explicit pair list.</td></tr>
+          <tr><td>Executive Office Quarterly Evaluation</td><td>Executive Team manager review of a named report, driven by an explicit pair list. The form code remains <code>ea_quarterly</code>.</td></tr>
           <tr><td>N/O</td><td>No opportunity to observe. A valid non-score on 360 items.</td></tr>
           <tr><td>Period</td><td><code>YYYY-Qn</code> for a quarter, <code>YYYY-MM</code> for a month.</td></tr>
           <tr><td>Working day</td><td>Monday to Friday. Leave allowance and department clashes use this count.</td></tr>
@@ -1166,62 +1168,56 @@ export default function Docs() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-foreground/15">
-        <div className="mx-auto max-w-6xl px-6 py-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary">
-              Venture Garden Group
-            </span>
-          </div>
+    <div className="min-h-full bg-background text-foreground">
+      <header className="border-b border-foreground/10">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <span className="inline-flex rounded-full bg-teal-100 px-3 py-1 text-[13px] font-medium text-teal-800">
+            Venture Garden Group
+          </span>
           <Link
             to="/"
-            className="font-mono text-[10px] uppercase tracking-[0.24em] text-foreground/70 hover:text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             ← Back to portal
           </Link>
         </div>
         <div className="mx-auto max-w-6xl px-6 pb-10">
-          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-foreground/60">
-            № v2 · Product and technical documentation
-          </p>
-          <h1 className="mt-3 font-serif text-5xl md:text-6xl leading-[0.95] tracking-tight">
-            VGG Workspace
+          <p className="text-sm text-muted-foreground">Product and technical documentation</p>
+          <h1 className="mt-2 font-display text-4xl font-semibold leading-tight md:text-5xl">
+            VGG workspace
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-foreground/70">
             How the group portal, the three company workspaces, and the shared tools behave: performance
             cycles, projects, leave, profiles, anonymity, and access control.
           </p>
-          <dl className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4 border-t border-foreground/15 pt-6">
+          <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-foreground/10 pt-6 md:grid-cols-5">
             {meta.map((m) => (
               <div key={m.label}>
-                <dt className="font-mono text-[9px] uppercase tracking-[0.22em] text-foreground/60">{m.label}</dt>
-                <dd className="mt-1 text-sm">{m.value}</dd>
+                <dt className="text-sm text-muted-foreground">{m.label}</dt>
+                <dd className="mt-1 text-sm font-medium">{m.value}</dd>
               </div>
             ))}
           </dl>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-12 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-12">
-        <aside className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
-          <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-foreground/60 mb-3">Contents</p>
-          <nav className="border-l border-foreground/15">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 py-12 lg:grid-cols-[240px_1fr]">
+        <aside className="app-sticky-subnav lg:top-4 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto">
+          <p className="mb-3 text-sm font-medium text-foreground/70">Contents</p>
+          <nav className="space-y-1">
             {SECTIONS.map((s) => {
               const isActive = active === s.id;
               return (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className={`group block pl-4 -ml-px py-1.5 border-l text-sm transition-colors ${
+                  className={`flex items-start gap-2 rounded-2xl px-2.5 py-1.5 text-sm transition-colors ${
                     isActive
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-foreground/60 hover:text-foreground"
+                      ? "bg-teal-100 font-medium text-teal-900"
+                      : "text-foreground/60 hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <span className="font-mono text-[10px] tracking-[0.14em] mr-2 text-foreground/50 group-hover:text-foreground/70">
-                    {s.num}
-                  </span>
+                  <span className="mt-0.5 tabular-nums text-muted-foreground">{s.num}</span>
                   {s.title}
                 </a>
               );
@@ -1231,11 +1227,9 @@ export default function Docs() {
 
         <main className="docs-prose min-w-0">
           {SECTIONS.map((s) => (
-            <section key={s.id} id={s.id} className="scroll-mt-6 mb-16">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary">
-                Section {s.num}
-              </p>
-              <h2 className="mt-2 font-serif text-3xl md:text-4xl tracking-tight border-b border-foreground/15 pb-3">
+            <section key={s.id} id={s.id} className="mb-16 scroll-mt-24">
+              <p className="text-sm font-medium text-teal-800">Section {s.num}</p>
+              <h2 className="mt-2 border-b border-foreground/10 pb-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
                 {s.title}
               </h2>
               <div className="mt-6 space-y-4 text-[15px] leading-relaxed text-foreground/85">
@@ -1243,8 +1237,8 @@ export default function Docs() {
               </div>
             </section>
           ))}
-          <footer className="border-t border-foreground/15 pt-6 mt-16 flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/60 font-mono uppercase tracking-[0.18em]">
-            <span>End of document · /docs</span>
+          <footer className="mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 pt-6 text-sm text-muted-foreground">
+            <span>End of document</span>
             <span>VGG · October 2026</span>
           </footer>
         </main>

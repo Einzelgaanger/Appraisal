@@ -45,7 +45,7 @@ export async function ghcGetMonthlySelfCheckin(id: string) {
 
 export async function ghcUpsertMonthlySelfCheckin(payload: Record<string, unknown>) {
   const { data, error } = await db.rpc('ghc_upsert_monthly_self_checkin', { _payload: payload });
-  if (error) throw error;
+  if (error) throw new Error(error.message || 'Could not save the check-in');
   return data as string;
 }
 

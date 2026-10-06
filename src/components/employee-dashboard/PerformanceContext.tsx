@@ -84,7 +84,7 @@ export default function PerformanceContext({ scores, meta, yourOverall, ranks }:
               <div key={r.scope} className={`p-3 rounded-xl border border-border ${pl.bg}`}>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Icon className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{SCOPE_META[r.scope].label}</span>
+                  <span className="text-sm font-medium text-muted-foreground">{SCOPE_META[r.scope].label}</span>
                 </div>
                 {r.total > 0 ? (
                   <>

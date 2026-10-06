@@ -104,7 +104,7 @@ export default function WeeklyReflection({ userId }: Props) {
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <label className="block">
-      <div className="mono text-[10px] uppercase tracking-[0.18em] text-foreground mb-1.5">{label}</div>
+      <div className="mb-1.5 text-sm font-medium text-foreground">{label}</div>
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

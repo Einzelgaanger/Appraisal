@@ -235,7 +235,7 @@ export default function GhcReviewHub({
         <div className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p>
             <span className="font-medium">People Ops / HR</span>
-            {' — '}track Q3 completion, release peer 360 when ready, and review named feedback in{' '}
+            {' — '}track completion and review named feedback in{' '}
             <strong>HR Monitor</strong>.
           </p>
           <Button size="sm" variant="secondary" className={cn(softButton, 'shrink-0')} onClick={() => setTab('admin')}>

@@ -9,13 +9,27 @@ const corsHeaders = {
 type ProfilePayload = {
   name?: unknown;
   role?: unknown;
+  additional_roles?: unknown;
   department?: unknown;
+  additional_departments?: unknown;
   subsidiary_id?: unknown;
   hierarchy_level?: unknown;
 };
 
 const cleanText = (value: unknown, max = 120) =>
   typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
+
+const cleanList = (value: unknown, max = 8) => {
+  if (!Array.isArray(value)) return null;
+  const out: string[] = [];
+  for (const item of value) {
+    const text = cleanText(item, 80);
+    if (!text || out.some((existing) => existing.toLowerCase() === text.toLowerCase())) continue;
+    out.push(text);
+    if (out.length >= max) break;
+  }
+  return out;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -59,6 +73,12 @@ Deno.serve(async (req) => {
     const name = cleanText(payload.name, 140);
     const role = cleanText(payload.role, 140);
     const department = cleanText(payload.department, 140);
+    const additionalRoles = cleanList(payload.additional_roles)?.filter(
+      (item) => item.toLowerCase() !== role.toLowerCase(),
+    ) ?? null;
+    const additionalDepartments = cleanList(payload.additional_departments)?.filter(
+      (item) => item.toLowerCase() !== department.toLowerCase(),
+    ) ?? null;
     const subsidiaryId = cleanText(payload.subsidiary_id, 80);
     const hierarchyLevel = Number(payload.hierarchy_level);
 
@@ -117,9 +137,19 @@ Deno.serve(async (req) => {
       ? hierarchyLevel
       : (existingEmployee.hierarchy_level as number);
 
+    const employeePatch: Record<string, unknown> = { name, role, department, email };
+    const profilePatch: Record<string, unknown> = { name, role, department };
+    if (additionalRoles !== null) {
+      employeePatch.additional_roles = additionalRoles;
+      profilePatch.additional_roles = additionalRoles;
+    }
+    if (additionalDepartments !== null) {
+      employeePatch.additional_departments = additionalDepartments;
+      profilePatch.additional_departments = additionalDepartments;
+    }
     const { error: employeeError } = await admin
       .from("employees")
-      .update({ name, role, department, email })
+      .update(employeePatch)
       .eq("id", employeeId);
     if (employeeError) throw employeeError;
 
@@ -129,9 +159,7 @@ Deno.serve(async (req) => {
       .upsert({
         id: userData.user.id,
         email,
-        name,
-        role,
-        department,
+        ...profilePatch,
         subsidiary_id: effectiveSubsidiaryId,
         hierarchy_level: effectiveHierarchyLevel,
         employee_id: employeeId,

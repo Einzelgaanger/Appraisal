@@ -42,6 +42,8 @@ export const GHC_ROLES = [
   'Finance Lead',
   'People Manager',
   'Head of Legal',
+  'Head of Operations',
+  'Head of Legal & Operations',
   'Partner',
   'Managing Partner',
 ] as const;

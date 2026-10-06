@@ -157,17 +157,15 @@ export default function GhcAdminMonitor({
     );
   }
 
-  const peerReleased = formatReleased(cycle?.peer_360_released_at);
-
   return (
     <div className="space-y-4">
       {hrMode && (
-        <div className="glass-panel p-4 border-l-4 border-l-primary">
-          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">People Ops workspace</p>
-          <h3 className="text-base font-semibold mt-1">HR monitor — {periodQuarter}</h3>
+        <div className="rounded-3xl bg-gradient-to-r from-teal-50 via-white to-amber-50 p-5 ring-1 ring-teal-100">
+          <p className="text-sm text-muted-foreground">People Ops</p>
+          <h3 className="mt-1 font-display text-xl font-semibold">HR monitor — {periodQuarter}</h3>
           <p className="text-xs text-muted-foreground mt-2 max-w-2xl leading-relaxed">
-            See who has finished self check-in and 360, release aggregated peer results when the cycle is ready, and
-            review named 360 responses below (HR-only). Employees still see anonymous aggregates after release.
+            See who has finished self check-in and 360, and review named 360 responses below (HR-only).
+            Employees already see anonymous aggregates together. There is no release step.
           </p>
         </div>
       )}
@@ -178,30 +176,23 @@ export default function GhcAdminMonitor({
           { label: 'Self check-in open', value: summary?.monthlySelfOpen ?? 0 },
           { label: '360 submitted', value: `${summary?.peer360Submitted ?? 0}/${summary?.peer360Expected ?? 0}` },
         ].map((s) => (
-          <div key={s.label} className="glass-panel p-4">
-            <p className="text-xl font-bold">{s.value}</p>
-            <p className="text-[10px] text-muted-foreground">{s.label}</p>
+          <div key={s.label} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <p className="font-display text-2xl font-semibold">{s.value}</p>
+            <p className="text-sm text-muted-foreground">{s.label}</p>
           </div>
         ))}
       </div>
 
       <div className="glass-panel p-5 space-y-3">
-        <h3 className="text-sm font-semibold">Open feedback for employees</h3>
+        <h3 className="text-sm font-semibold">360 results</h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Until you release peer 360 for <strong>{periodQuarter}</strong>, people only see “waiting for People Ops”.
-          Release does not change anonymity for employees — they get aggregated scores only. Named reviews stay in the
-          section below for People Ops.
+          Peer 360 for <strong>{periodQuarter}</strong> is open for everyone at the same time. There is no HR release
+          step. Employees see anonymous aggregates only. Named reviews stay in the section below for People Ops.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {peerReleased ? (
-            <Badge variant="default" className="text-[10px]">
-              Peer 360 open since {peerReleased}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-[10px]">
-              Peer 360 not open yet
-            </Badge>
-          )}
+          <Badge variant="default" className="text-[10px]">
+            Visible to everyone
+          </Badge>
           {cycle?.quarterly_evaluation_released_at ? (
             <Badge variant="secondary" className="text-[10px]">
               Eval marked released {formatReleased(cycle.quarterly_evaluation_released_at)}
@@ -209,9 +200,6 @@ export default function GhcAdminMonitor({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => void release('peer_360')}>
-            {peerReleased ? `Re-confirm peer 360 open (${periodQuarter})` : `Release peer 360 (${periodQuarter})`}
-          </Button>
           <Button size="sm" variant="outline" onClick={() => void release('quarterly_evaluation')}>
             Mark eval period released
           </Button>

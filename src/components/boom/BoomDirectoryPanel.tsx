@@ -227,7 +227,7 @@ export default function BoomDirectoryPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ClipboardCheck className="w-4 h-4 text-primary" />
-              <h4 className="text-sm font-semibold">EA quarterly completion</h4>
+              <h4 className="text-sm font-semibold">Executive Office Quarterly Evaluation</h4>
               <Badge variant="outline" className="text-[10px] font-mono">
                 {periodQuarter}
               </Badge>
@@ -237,7 +237,7 @@ export default function BoomDirectoryPanel({
             </p>
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Updates automatically when a line manager submits an EA quarterly evaluation. Open a person below for
+            Updates automatically when a line manager submits an Executive Office Quarterly Evaluation. Open a person below for
             who completed it and their cumulative %.
           </p>
           <div className="grid gap-1.5 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
@@ -279,7 +279,7 @@ export default function BoomDirectoryPanel({
           <Badge variant="outline" className="text-[10px]">Level 2 · masked 360</Badge>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Open a colleague to see monthly self status, EA quarterly completion, performance self status, and
+          Open a colleague to see monthly self status, Executive Office Quarterly Evaluation completion, performance self status, and
           aggregated anonymous 360 (no reviewer names).
         </p>
         {loading ? (
@@ -345,7 +345,7 @@ export default function BoomDirectoryPanel({
 
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] uppercase text-muted-foreground">EA quarterly ({periodQuarter})</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Executive Office Quarterly Evaluation ({periodQuarter})</p>
                   <Badge
                     variant="outline"
                     className={cn('text-[9px]', eaStatusBadge(insight.ea_quarterly_status).className)}
@@ -358,7 +358,7 @@ export default function BoomDirectoryPanel({
                   evaluation{(insight.ea_quarterly_expected ?? 0) === 1 ? '' : 's'} submitted.
                 </p>
                 {(insight.ea_quarterly_submissions ?? []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No EA quarterly started for this period yet.</p>
+                  <p className="text-xs text-muted-foreground">No Executive Office Quarterly Evaluation started for this period yet.</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {(insight.ea_quarterly_submissions ?? []).map((s) => (

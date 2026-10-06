@@ -4,13 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { ghcGetDirectory } from './ghcApi';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
+import { asStringList, formatRoles, formatTeams } from '@/lib/personCoverage';
+import { type OrgPerson } from '@/lib/orgChart';
+import { OrgChartView } from '@/components/org/OrgChartPanel';
 import { useTenant } from '@/tenants/TenantContext';
 
 type Row = {
   id: string;
   name: string;
   role: string | null;
+  additional_roles?: string[] | null;
   department: string | null;
+  additional_departments?: string[] | null;
   hierarchy_level: number | null;
   manager_id: string | null;
   secondary_manager_id: string | null;
@@ -60,6 +65,21 @@ export default function GhcDirectoryPanel({
   }, [rows, viewerEmployeeId]);
 
   const visible = onlyReports && viewerEmployeeId ? myReports : rows;
+  const chartPeople = useMemo<OrgPerson[]>(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        additional_roles: asStringList(row.additional_roles),
+        department: row.department,
+        additional_departments: asStringList(row.additional_departments),
+        hierarchy_level: row.hierarchy_level,
+        manager_id: row.manager_id,
+        secondary_manager_id: row.secondary_manager_id,
+      })),
+    [rows],
+  );
 
   if (loading) {
     return (
@@ -70,6 +90,14 @@ export default function GhcDirectoryPanel({
   }
 
   return (
+    <div className="space-y-4">
+    <OrgChartView
+      people={chartPeople}
+      viewerId={viewerEmployeeId}
+      lowerIsSenior
+      appraisalMode={tenant.appraisalMode}
+      subsidiaryId={tenant.subsidiaryId}
+    />
     <div className="glass-panel p-5 overflow-x-auto space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
@@ -115,7 +143,10 @@ export default function GhcDirectoryPanel({
                   {r.name}
                   {isMine && <Badge variant="outline" className="ml-2 text-[9px]">Your report</Badge>}
                 </td>
-                <td className="py-2 pr-3 hidden sm:table-cell text-xs text-muted-foreground">{r.role ?? '—'}</td>
+                <td className="py-2 pr-3 hidden sm:table-cell text-xs text-muted-foreground">
+                  {formatRoles(r.role, asStringList(r.additional_roles), '—')}
+                  <span className="block text-[11px]">{formatTeams(r.department, asStringList(r.additional_departments), '')}</span>
+                </td>
                 <td className="py-2 pr-3 text-xs text-muted-foreground">
                   {displayHierarchyLabel(r.hierarchy_level, true, { appraisalMode: tenant.appraisalMode })}
                 </td>
@@ -139,6 +170,7 @@ export default function GhcDirectoryPanel({
           })}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

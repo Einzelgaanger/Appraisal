@@ -44,6 +44,7 @@ import BoomNotificationsBell from '@/components/boom/BoomNotificationsBell';
 import GhcReviewHub from '@/modules/ghc/GhcReviewHub';
 import GhcNotificationsBell from '@/modules/ghc/GhcNotificationsBell';
 import GhcMyResults from '@/modules/ghc/GhcMyResults';
+import CompanyOrgChart from '@/components/org/OrgChartPanel';
 import ProjectsWorkspace from '@/modules/workspace/ProjectsWorkspace';
 import LeavePlanner from '@/modules/workspace/LeavePlanner';
 import MyProfilePanel from '@/components/MyProfilePanel';
@@ -53,10 +54,12 @@ import {
   assignHierarchyPool,
 } from '@/lib/hierarchyConvention';
 import { defaultQuarterPeriod, resolveQuarterPeriod } from '@/lib/boomPeriods';
+import QuarterScoreHistory from '@/components/employee-dashboard/QuarterScoreHistory';
 import { fetchMyAggregatedPeer360Scores, fetchMy360Dashboard, fetchOrgPerformanceRankings, fetchGrowthHubPulse, buildBoomGrowthAiContext, type GrowthHubPulseMode } from '@/lib/boomDashboard360';
 import { fetchMyEaQuarterlyResults, type EaQuarterlyResults } from '@/lib/boomEaQuarterly';
 import { isMeaningfulQualitativeAnswer } from '@/lib/qualitativeFeedback';
 import EaQuarterlyDashboardCard from '@/components/employee-dashboard/EaQuarterlyDashboardCard';
+import { formatRoles, formatTeams } from '@/lib/personCoverage';
 import { isBoomTenant, isGhcStyleAppraisal } from '@/tenants/config';
 import { useTenant } from '@/tenants/TenantContext';
 
@@ -66,7 +69,17 @@ interface FeedbackItem {
 }
 
 interface Subsidiary { id: string; name: string; hierarchy_lower_is_senior?: boolean; }
-interface Employee { id: string; name: string; role: string | null; department: string | null; subsidiary_id: string; email: string | null; hierarchy_level: number | null; }
+interface Employee {
+  id: string;
+  name: string;
+  role: string | null;
+  additional_roles?: string[] | null;
+  department: string | null;
+  additional_departments?: string[] | null;
+  subsidiary_id: string;
+  email: string | null;
+  hierarchy_level: number | null;
+}
 interface Category { id: string; name: string; sort_order: number; }
 interface Question { id: string; category_id: string; question_text: string; question_type: string; sort_order: number; }
 interface CategoryScore { category: string; myScore: number; orgAvg: number; }
@@ -262,7 +275,7 @@ export default function EmployeeHub() {
 
     void loadDashboardData(currentEmployee.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDashboardData closes over many hub fields
-  }, [activeTab, currentEmployee?.id, user, ghcMode]);
+  }, [activeTab, currentEmployee?.id, user, ghcMode, hubQuarter]);
 
   const loadDashboardData = async (employeeId: string) => {
     if (!user) return;
@@ -272,7 +285,7 @@ export default function EmployeeHub() {
     setDashboardScoreSource('none');
     setEaQuarterlyResults(null);
     try {
-      const q = defaultQuarterPeriod();
+      const q = hubQuarter;
 
       if (boomMode) {
         const eaResults = await fetchMyEaQuarterlyResults(q);
@@ -445,7 +458,7 @@ export default function EmployeeHub() {
         });
 
         if (cats.length === 0) {
-          const q = defaultQuarterPeriod();
+          const q = hubQuarter;
           const boom = await fetchMyAggregatedPeer360Scores(q);
           if (boom?.scores.length) {
             setMyScores(boom.scores);
@@ -674,7 +687,7 @@ export default function EmployeeHub() {
         })();
         }
       } else {
-        const q = defaultQuarterPeriod();
+        const q = hubQuarter;
         const boom = await fetchMyAggregatedPeer360Scores(q);
         if (boom?.scores.length) {
           setMyScores(boom.scores);
@@ -948,6 +961,15 @@ export default function EmployeeHub() {
     return parseFloat((myScores.reduce((s, c) => s + c.orgAvg, 0) / myScores.length).toFixed(2));
   }, [myScores]);
 
+  const setHubQuarter = (quarter: string) => {
+    const key = ghcMode ? 'ghcQuarter' : 'boomQuarter';
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set(key, quarter);
+      return next;
+    });
+  };
+
   const setTab = (tab: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -1002,8 +1024,8 @@ export default function EmployeeHub() {
         subtitle={profile?.name}
         meta={[
           { label: ghcMode ? 'Company' : 'Subsidiary', value: currentEmployeeSubsidiary ?? 'Unlisted' },
-          { label: ghcMode ? 'Team' : 'Department', value: currentEmployee?.department ?? profile?.department ?? 'Unassigned' },
-          { label: 'Role', value: currentEmployee?.role ?? 'Employee' },
+          { label: ghcMode ? 'Team' : 'Department', value: formatTeams(currentEmployee?.department ?? profile?.department, currentEmployee?.additional_departments) },
+          { label: 'Role', value: formatRoles(currentEmployee?.role ?? profile?.role, currentEmployee?.additional_roles) },
         ]}
         onLogout={handleLogout}
         items={[
@@ -1131,13 +1153,18 @@ export default function EmployeeHub() {
           {/* ============ DASHBOARD TAB ============ */}
           <TabsContent value="dashboard" className="mt-4">
             {ghcMode ? (
+              <div className="space-y-4">
+                <CompanyOrgChart viewerId={currentEmployee?.id} />
               <GhcMyResults
                 periodQuarter={hubQuarter}
+                onPeriodChange={setHubQuarter}
                 acknowledgeTask={null}
                 onAcknowledged={() => undefined}
               />
+              </div>
             ) : (
             <motion.div {...pageTransition}>
+              <QuarterScoreHistory activePeriod={hubQuarter} onSelect={setHubQuarter} />
               {dashboardLoading ? (
                 <EmployeeDashboardTabSkeleton />
               ) : (
@@ -1147,50 +1174,48 @@ export default function EmployeeHub() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 >
+                  <CompanyOrgChart viewerId={currentEmployee?.id} />
                   <AnonymityBanner />
                   {boom360DashMeta && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="glass-panel p-4 border border-primary/20 bg-primary/5"
+                      className="rounded-3xl bg-sky-50 p-4 ring-1 ring-sky-100"
                     >
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         <span className="font-semibold text-foreground">BOOM peer 360</span> (quarter{' '}
                         <span className="font-mono">{boom360DashMeta.period}</span>): these scores are{' '}
                         <strong>aggregated anonymous peer averages</strong> by behaviour section. The legacy multi-subsidiary
-                        survey &quot;feedback by source&quot; breakdown does not apply. Complete open 360 tasks under{' '}
-                        <strong>Survey</strong>; HR must release the quarter before averages appear here.
+                        survey &quot;feedback by source&quot; breakdown does not apply. Use the quarter scores above to open
+                        an earlier period, including Q2.
                       </p>
                     </motion.div>
                   )}
                   {/* Your Level & Pool Summary */}
-                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Users className="w-3.5 h-3.5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold">Your Appraisal Pool</h3>
-                          <p className="text-[10px] text-muted-foreground">
-                            Level: {displayHierarchyLabel(myHierarchyLevel, mySubsidiaryLowerSenior)} — {globalPoolCounts.total}{' '}
-                            people may be in your 360 network. BOOM quarterly forms (executive, peer 360, monthly self) are
-                            assigned separately on the Survey tab.
-                          </p>
-                        </div>
+                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                    <div className="mb-4 flex items-start gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-800">
+                        <Users className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <h3 className="font-display text-lg font-semibold">Your appraisal pool</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Level: {displayHierarchyLabel(myHierarchyLevel, mySubsidiaryLowerSenior)} — {globalPoolCounts.total}{' '}
+                          people may be in your 360 network. Quarterly forms are assigned separately on the Appraiser tab.
+                        </p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       {[
-                        { label: 'Above You', count: globalPoolCounts.above, icon: <ArrowUp className="w-3.5 h-3.5" />, color: 'text-blue-600 bg-blue-500/10' },
-                        { label: 'Your Peers', count: globalPoolCounts.peers, icon: <ArrowLeftRight className="w-3.5 h-3.5" />, color: 'text-emerald-600 bg-emerald-500/10' },
-                        { label: 'Below You', count: globalPoolCounts.below, icon: <ArrowDown className="w-3.5 h-3.5" />, color: 'text-amber-600 bg-amber-500/10' },
+                        { label: 'Above you', count: globalPoolCounts.above, icon: <ArrowUp className="h-4 w-4" />, color: 'text-sky-800 bg-sky-100' },
+                        { label: 'Your peers', count: globalPoolCounts.peers, icon: <ArrowLeftRight className="h-4 w-4" />, color: 'text-emerald-800 bg-emerald-100' },
+                        { label: 'Below you', count: globalPoolCounts.below, icon: <ArrowDown className="h-4 w-4" />, color: 'text-amber-900 bg-amber-100' },
                       ].map(p => (
-                        <div key={p.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40">
-                          <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${p.color}`}>{p.icon}</span>
+                        <div key={p.label} className="flex items-center gap-3 rounded-2xl bg-muted/40 p-3">
+                          <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${p.color}`}>{p.icon}</span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">{p.label}</p>
-                            <p className="text-sm font-bold">{p.count}</p>
+                            <p className="text-sm text-muted-foreground">{p.label}</p>
+                            <p className="font-display text-xl font-semibold">{p.count}</p>
                           </div>
                         </div>
                       ))}
@@ -1199,76 +1224,76 @@ export default function EmployeeHub() {
 
                   {/* Stats row */}
                   {boom360DashMeta ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Star className="w-3.5 h-3.5 text-primary" />
-                          </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-900">
+                            <Star className="h-5 w-5" />
+                          </span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">Overall (360 avg.)</p>
-                            <p className="text-xl font-bold">{overallScore}<span className="text-xs font-normal text-muted-foreground">/5</span></p>
+                            <p className="text-sm text-muted-foreground">Overall (360 average)</p>
+                            <p className="font-display text-2xl font-semibold">{overallScore}<span className="text-sm font-normal text-muted-foreground">/5</span></p>
                           </div>
                         </div>
                       </motion.div>
-                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-panel p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                            <BarChart3 className="w-3.5 h-3.5 text-accent" />
-                          </div>
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                            <BarChart3 className="h-5 w-5" />
+                          </span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">BOOM quarter</p>
-                            <p className="text-lg font-bold font-mono">{boom360DashMeta.period}</p>
+                            <p className="text-sm text-muted-foreground">This quarter</p>
+                            <p className="font-display text-2xl font-semibold">{boom360DashMeta.period}</p>
                           </div>
                         </div>
                       </motion.div>
-                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-panel p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <Users className="w-3.5 h-3.5 text-emerald-600" />
-                          </div>
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                            <Users className="h-5 w-5" />
+                          </span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">Peer depth (max section)</p>
-                            <p className="text-xl font-bold">{boom360DashMeta.maxPeerResponses}</p>
+                            <p className="text-sm text-muted-foreground">Peer depth</p>
+                            <p className="font-display text-2xl font-semibold">{boom360DashMeta.maxPeerResponses}</p>
                           </div>
                         </div>
                       </motion.div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Star className="w-3.5 h-3.5 text-primary" />
-                          </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-900">
+                            <Star className="h-5 w-5" />
+                          </span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">Overall</p>
-                            <p className="text-xl font-bold">{overallScore}<span className="text-xs font-normal text-muted-foreground">/5</span></p>
+                            <p className="text-sm text-muted-foreground">Overall</p>
+                            <p className="font-display text-2xl font-semibold">{overallScore}<span className="text-sm font-normal text-muted-foreground">/5</span></p>
                           </div>
                         </div>
                       </motion.div>
-                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-panel p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                            <BarChart3 className="w-3.5 h-3.5 text-accent" />
-                          </div>
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                            <BarChart3 className="h-5 w-5" />
+                          </span>
                           <div>
-                            <p className="text-[10px] text-muted-foreground">Org Avg</p>
-                            <p className="text-xl font-bold">{orgOverall}<span className="text-xs font-normal text-muted-foreground">/5</span></p>
+                            <p className="text-sm text-muted-foreground">Org average</p>
+                            <p className="font-display text-2xl font-semibold">{orgOverall}<span className="text-sm font-normal text-muted-foreground">/5</span></p>
                           </div>
                         </div>
                       </motion.div>
                       {[
-                        { label: 'From Above', count: directionCounts.above, icon: '↓', color: 'text-blue-500 bg-blue-500/10' },
-                        { label: 'From Peers', count: directionCounts.peer, icon: '↔', color: 'text-emerald-500 bg-emerald-500/10' },
-                        { label: 'From Below', count: directionCounts.below, icon: '↑', color: 'text-amber-500 bg-amber-500/10' },
+                        { label: 'From above', count: directionCounts.above, icon: '↓', color: 'text-sky-800 bg-sky-100' },
+                        { label: 'From peers', count: directionCounts.peer, icon: '↔', color: 'text-emerald-800 bg-emerald-100' },
+                        { label: 'From below', count: directionCounts.below, icon: '↑', color: 'text-amber-900 bg-amber-100' },
                       ].map((d, i) => (
-                        <motion.div key={d.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }} className="glass-panel p-4">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${d.color}`}>{d.icon}</div>
+                        <motion.div key={d.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                          <div className="flex items-center gap-3">
+                            <span className={`flex h-11 w-11 items-center justify-center rounded-2xl text-base font-semibold ${d.color}`}>{d.icon}</span>
                             <div>
-                              <p className="text-[10px] text-muted-foreground">{d.label}</p>
-                              <p className="text-xl font-bold">{d.count}</p>
+                              <p className="text-sm text-muted-foreground">{d.label}</p>
+                              <p className="font-display text-2xl font-semibold">{d.count}</p>
                             </div>
                           </div>
                         </motion.div>
@@ -1425,12 +1450,12 @@ export default function EmployeeHub() {
                       {!boom360Pending.released ? (
                         <p className="text-muted-foreground text-sm max-w-md mx-auto leading-relaxed">
                           Loading your anonymous 360 feedback for{' '}
-                          <span className="font-mono">{defaultQuarterPeriod()}</span>…
+                          <span className="font-mono">{hubQuarter}</span>…
                         </p>
                       ) : boom360Pending.peerCount < boom360Pending.minRequired ? (
                         <p className="text-muted-foreground text-sm max-w-md mx-auto leading-relaxed">
                           No peer 360 reviews about you for{' '}
-                          <span className="font-mono">{defaultQuarterPeriod()}</span> yet. Aggregated scores and themes
+                          <span className="font-mono">{hubQuarter}</span> yet. Aggregated scores and themes
                           appear here automatically as colleagues submit — individual reviewers stay anonymous.
                         </p>
                       ) : (
@@ -1448,8 +1473,8 @@ export default function EmployeeHub() {
                         If you use the <strong>legacy organisation-wide survey</strong>, scores appear when colleagues submit
                         reviews about you. For the <strong>Executive Office BOOM</strong> programme, open{' '}
                         <strong>Survey</strong> — complete peer 360 tasks; your anonymous aggregated 360 chart updates live
-                        as colleagues rate you for <span className="font-mono">{defaultQuarterPeriod()}</span>. Your EA
-                        quarterly manager evaluation also appears here once submitted.
+                        as colleagues rate you for <span className="font-mono">{hubQuarter}</span>. Your Executive
+                        Office Quarterly Evaluation also appears here once submitted.
                       </p>
                     </motion.div>
                   ) : null}
@@ -1489,7 +1514,7 @@ export default function EmployeeHub() {
                   <img src={brand.faviconHref} alt="Growth Hub" className="w-10 h-10 mx-auto mb-4 rounded-xl object-contain" />
                   <h2 className="text-lg font-semibold mb-2">Growth Hub Unlocks With Feedback</h2>
                   <p className="text-muted-foreground text-sm max-w-md mx-auto leading-relaxed">
-                    We use your <strong>dashboard competency scores</strong> (legacy survey and/or released BOOM peer 360).
+                    We use your <strong>dashboard competency scores</strong> (legacy survey and/or BOOM peer 360).
                     Complete open reviews on the <strong>Survey</strong> tab; once averages show on <strong>My Dashboard</strong>,
                     pick a focus area below for resources and your IDP.
                   </p>
@@ -1691,7 +1716,9 @@ export default function EmployeeHub() {
               <MyProfilePanel
                 companyName={currentEmployeeSubsidiary ?? null}
                 employeeRole={currentEmployee?.role ?? profile?.role ?? null}
+                employeeAdditionalRoles={currentEmployee?.additional_roles}
                 employeeDepartment={currentEmployee?.department ?? profile?.department ?? null}
+                employeeAdditionalDepartments={currentEmployee?.additional_departments}
                 employeeName={currentEmployee?.name ?? profile?.name ?? null}
                 onSaved={() => void loadData()}
               />

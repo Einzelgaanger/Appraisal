@@ -3,7 +3,24 @@ import { supabase } from '@/integrations/supabase/client';
 const db = supabase as any;
 
 export type LeaveType = 'annual' | 'compassionate' | 'maternity' | 'study' | 'sick' | 'unpaid' | 'parental' | 'other';
-export type LeaveStatus = 'pending' | 'manager_approved' | 'approved' | 'declined' | 'cancelled';
+export type LeaveStatus = 'pending' | 'hr_approved' | 'manager_approved' | 'approved' | 'declined' | 'cancelled';
+
+export const LEAVE_ALLOWANCE: Record<LeaveType, number> = {
+  annual: 10,
+  sick: 10,
+  compassionate: 5,
+  maternity: 90,
+  parental: 10,
+  study: 10,
+  unpaid: 15,
+  other: 5,
+};
+
+export type LeaveTypeBalance = {
+  allowance: number;
+  used: number;
+  remaining: number;
+};
 
 export type LeaveRequest = {
   id: string;
@@ -39,6 +56,7 @@ export type LeaveBalance = {
   allowed_end: string;
   quarter_start: string;
   quarter_end: string;
+  balances: Partial<Record<LeaveType, LeaveTypeBalance>>;
 };
 
 function rpcError(error: { message?: string } | null): never {
@@ -49,6 +67,23 @@ export async function listLeave(): Promise<LeaveRequest[]> {
   const { data, error } = await db.rpc('workspace_list_leave');
   if (error) rpcError(error);
   return Array.isArray(data) ? data : [];
+}
+
+function readBalances(raw: unknown): Partial<Record<LeaveType, LeaveTypeBalance>> {
+  if (!raw || typeof raw !== 'object') return {};
+  const out: Partial<Record<LeaveType, LeaveTypeBalance>> = {};
+  for (const key of Object.keys(LEAVE_ALLOWANCE) as LeaveType[]) {
+    const row = (raw as Record<string, { allowance?: number; used?: number; remaining?: number }>)[key];
+    if (!row) continue;
+    const allowance = Number(row.allowance ?? LEAVE_ALLOWANCE[key]);
+    const used = Number(row.used ?? 0);
+    out[key] = {
+      allowance,
+      used,
+      remaining: Number(row.remaining ?? Math.max(0, allowance - used)),
+    };
+  }
+  return out;
 }
 
 export async function myLeaveBalance(): Promise<LeaveBalance> {
@@ -71,6 +106,7 @@ export async function myLeaveBalance(): Promise<LeaveBalance> {
     allowed_end: data?.allowed_end ?? '',
     quarter_start: data?.quarter_start ?? '',
     quarter_end: data?.quarter_end ?? '',
+    balances: readBalances(data?.balances),
   };
 }
 
@@ -139,5 +175,5 @@ export function workingDays(startDate: string, endDate: string): number {
 }
 
 export function isActiveLeave(status: LeaveStatus) {
-  return status === 'pending' || status === 'manager_approved' || status === 'approved';
+  return status === 'pending' || status === 'hr_approved' || status === 'manager_approved' || status === 'approved';
 }

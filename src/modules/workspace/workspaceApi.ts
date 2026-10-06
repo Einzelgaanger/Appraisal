@@ -154,8 +154,10 @@ export type WorkspaceColleague = {
   id: string;
   name: string;
   role: string | null;
+  additional_roles?: string[] | null;
   email: string | null;
   department: string | null;
+  additional_departments?: string[] | null;
   avatar_url: string | null;
 };
 

@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { boomScoreBand, type EaQuarterlyResults, type EaQuarterlySubmission } from '@/lib/boomEaQuarterly';
 
 function SubmissionCard({ sub }: { sub: EaQuarterlySubmission }) {
@@ -31,7 +30,7 @@ function SubmissionCard({ sub }: { sub: EaQuarterlySubmission }) {
 
       {sub.sections?.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Section averages</p>
+          <p className="mb-2 text-sm text-muted-foreground">Section averages</p>
           <ul className="space-y-1.5">
             {sub.sections.map((s) => (
               <li
@@ -51,7 +50,7 @@ function SubmissionCard({ sub }: { sub: EaQuarterlySubmission }) {
 
       {scored.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Rated items</p>
+          <p className="mb-2 text-sm text-muted-foreground">Rated items</p>
           <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
             {scored.map((a, i) => (
               <li key={i} className="rounded-lg border border-border/50 px-3 py-2 text-xs space-y-1">
@@ -70,7 +69,7 @@ function SubmissionCard({ sub }: { sub: EaQuarterlySubmission }) {
 
       {written.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Narrative</p>
+          <p className="mb-2 text-sm text-muted-foreground">Narrative</p>
           <ul className="space-y-2">
             {written.map((a, i) => (
               <li key={i} className="rounded-lg bg-muted/25 px-3 py-2 text-xs space-y-1">
@@ -104,22 +103,22 @@ export default function EaQuarterlyDashboardCard({ results }: EaQuarterlyDashboa
         );
 
   return (
-    <div className="glass-panel p-5 space-y-4">
+    <div className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-sm font-semibold">EA quarterly performance</h2>
-            <Badge variant="outline" className="text-[10px] font-mono">
+            <h2 className="text-sm font-semibold">Executive Office Quarterly Evaluation</h2>
+            <span className="rounded-full bg-muted px-2.5 py-0.5 text-[12px] font-medium text-muted-foreground">
               {results.period}
-            </Badge>
+            </span>
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed max-w-xl">
             Manager evaluation report for this quarter. Scores update automatically when your line manager
             submits. Full discussion thread is also under Appraisal → Discussions.
           </p>
         </div>
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-right min-w-[120px]">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Quarter score</p>
+        <div className="min-w-[120px] rounded-2xl bg-teal-50 px-4 py-3 text-right">
+          <p className="text-sm text-muted-foreground">Quarter score</p>
           <p className="text-3xl font-bold tabular-nums text-primary">
             {overallPct != null && !Number.isNaN(overallPct) ? `${overallPct}%` : '—'}
           </p>

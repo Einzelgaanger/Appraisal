@@ -77,7 +77,7 @@ export default function ResourceFeedback({ userId, resourceId, resourceTitle, fo
 
   if (submitted && !showReasons) {
     return (
-      <div className="flex items-center gap-2 text-[10px] mono uppercase tracking-[0.16em] text-foreground/70">
+      <div className="flex items-center gap-2 text-sm text-foreground/70">
         <Badge variant={score >= 4 ? 'green' : 'outline'} className="px-1.5">
           {score >= 4 ? '👍 Logged' : '👎 Logged'}
         </Badge>
@@ -89,7 +89,7 @@ export default function ResourceFeedback({ userId, resourceId, resourceTitle, fo
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="mono text-[10px] uppercase tracking-[0.18em] text-foreground/70">Relevant?</span>
+        <span className="text-sm font-medium text-foreground/70">Relevant?</span>
         <Button
           variant={score === 5 ? 'green' : 'outline'}
           size="sm"

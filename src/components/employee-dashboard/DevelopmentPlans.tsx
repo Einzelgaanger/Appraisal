@@ -181,7 +181,7 @@ export default function DevelopmentPlans({ userId, growthAreas, prefilledFocus, 
         <div className="space-y-2">
           {paths.filter((p) => p.status === 'active').length > 0 && (
             <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-primary">Active learning paths</p>
+              <p className="mb-2 text-sm font-medium text-teal-800">Active learning paths</p>
               <div className="space-y-1.5">
                 {paths
                   .filter((p) => p.status === 'active')
@@ -199,7 +199,7 @@ export default function DevelopmentPlans({ userId, growthAreas, prefilledFocus, 
             {active.map(p => (
               <motion.div key={p.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="p-3 rounded-xl border-l-4 border-l-primary bg-card/40 border border-border/40">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">{p.focus_area}</span>
+                  <span className="text-sm font-medium text-teal-800">{p.focus_area}</span>
                   <div className="flex gap-1">
                     <button onClick={() => complete(p.id)} className="text-emerald-600 hover:bg-emerald-500/10 p-1 rounded" title="Mark complete"><Check className="w-3 h-3" /></button>
                     <button onClick={() => archive(p.id)} className="text-muted-foreground hover:text-red-500 p-1 rounded" title="Archive"><Trash2 className="w-3 h-3" /></button>

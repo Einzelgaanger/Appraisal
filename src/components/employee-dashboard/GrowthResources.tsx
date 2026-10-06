@@ -237,7 +237,7 @@ export default function GrowthResources({ userId, focusArea, currentScore, feedb
       {loading && resources.length === 0 && (
         <div className="py-12 text-center">
           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
-          <p className="text-xs mono uppercase tracking-[0.2em]">Researching the best resources for you…</p>
+          <p className="text-sm">Researching the best resources for you…</p>
           <p className="text-[10px] text-foreground/60 mt-1">10–20 seconds.</p>
         </div>
       )}
@@ -269,7 +269,7 @@ export default function GrowthResources({ userId, focusArea, currentScore, feedb
                     <div className="w-6 h-6 border-2 border-foreground rounded-sm flex items-center justify-center bg-background shrink-0">
                       <Icon className="w-3 h-3" />
                     </div>
-                    <span className="mono text-[9px] uppercase tracking-[0.2em] font-bold">{Meta.label}</span>
+                    <span className="text-sm font-medium">{Meta.label}</span>
                   </div>
                   <button
                     onClick={() => dismiss(r)}
@@ -281,13 +281,13 @@ export default function GrowthResources({ userId, focusArea, currentScore, feedb
                 </div>
 
                 <h4 className="font-serif text-base font-bold leading-snug mb-1">{r.title}</h4>
-                <p className="text-[10px] mono uppercase tracking-[0.16em] text-foreground/60 mb-2">{r.source}</p>
+                <p className="mb-2 text-sm text-foreground/60">{r.source}</p>
 
                 <p className="text-[12px] leading-relaxed mb-2">{r.why_relevant}</p>
 
                 {r.why_picked && (
                   <div className="text-[11px] italic border-l-2 border-primary pl-2 py-1 mb-3 text-foreground/80 bg-primary/5">
-                    <span className="mono not-italic font-bold uppercase tracking-[0.16em] text-[9px] block mb-0.5">Why you</span>
+                    <span className="mb-0.5 block text-sm font-medium not-italic">Why this fits you</span>
                     {r.why_picked}
                   </div>
                 )}

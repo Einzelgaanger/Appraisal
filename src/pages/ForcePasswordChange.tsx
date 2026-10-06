@@ -37,6 +37,10 @@ export default function ForcePasswordChange() {
       const { error: updateError } = await updatePassword(password);
       if (updateError) throw new Error(updateError);
 
+      await (supabase as unknown as {
+        rpc: (fn: string) => Promise<{ error: { message: string } | null }>;
+      }).rpc('refresh_password_change_requirement');
+
       const { data, error: readError } = await supabase
         .from('profiles')
         .select('must_change_password')
@@ -61,9 +65,9 @@ export default function ForcePasswordChange() {
         <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
           <Lock className="h-5 w-5 text-primary" />
         </div>
-        <h1 className="mb-1 text-xl font-semibold">Choose your own password</h1>
+        <h1 className="mb-1 text-xl font-semibold">You're signed in</h1>
         <p className="mb-5 text-[13px] leading-relaxed text-muted-foreground">
-          This account is still using a shared company password. Set a personal password before continuing.
+          This account still uses a shared company password. Choose a personal one and the appraisal opens straight away.
         </p>
 
         <div className="space-y-3">

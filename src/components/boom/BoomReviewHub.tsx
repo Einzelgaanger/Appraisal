@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -10,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ClipboardList, Loader2, Sparkles, TrendingUp, UserCircle, Mail, MessageSquare, Users, LayoutDashboard, MessagesSquare } from 'lucide-react';
+import { ClipboardList, ClipboardPen, Loader2, Mail, MessageSquare, MessageSquareText, MessagesSquare, NotebookPen, ShieldCheck, Sparkles, TrendingUp, UserCircle, Users, LayoutDashboard } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BoomCommentsPanel from './BoomCommentsPanel';
 import BoomDirectoryPanel from './BoomDirectoryPanel';
@@ -65,21 +65,32 @@ const FORM_LABELS: Record<string, string> = {
   executive: 'Executive assessment',
   peer_360: '360 Peer review',
   monthly_self: 'Monthly self-assessment',
-  ea_quarterly: 'EA quarterly (manager)',
+  ea_quarterly: 'Executive Office Quarterly Evaluation',
   epa_gceo_assessor: 'Executive Performance Assessment (GCEO)',
 };
 
 /** Stable card order so every role sees the same structure */
+const softButton = 'h-9 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal';
+const pillTab = 'gap-1.5 rounded-full px-3.5 py-2 font-sans text-[13.5px] font-medium normal-case tracking-normal data-[state=active]:bg-teal-500 data-[state=active]:text-white';
+
+const FORM_LOOK: Record<string, { icon: typeof ClipboardList; chip: string }> = {
+  executive: { icon: ClipboardPen, chip: 'bg-rose-100 text-rose-800' },
+  epa_gceo_assessor: { icon: ShieldCheck, chip: 'bg-sky-100 text-sky-800' },
+  ea_quarterly: { icon: ClipboardList, chip: 'bg-amber-100 text-amber-900' },
+  peer_360: { icon: MessageSquareText, chip: 'bg-violet-100 text-violet-800' },
+  monthly_self: { icon: NotebookPen, chip: 'bg-teal-100 text-teal-800' },
+};
+
 const FORM_ORDER = ['executive', 'epa_gceo_assessor', 'ea_quarterly', 'peer_360', 'monthly_self'];
 const TEAM_MEMBER_FORM_ORDER = ['monthly_self', 'ea_quarterly', 'peer_360'];
 /** L2+ team members never receive executive self-assessment via assignments */
 const TEAM_MEMBER_BLOCKED_FORMS = new Set(['executive']);
 
 function statusBadge(status: string) {
-  if (status === 'submitted') return <Badge className="text-[10px] bg-emerald-600">Done</Badge>;
-  if (status === 'draft') return <Badge variant="secondary" className="text-[10px]">In progress</Badge>;
-  if (status === 'waiting_self') return <Badge variant="outline" className="text-[10px]">Awaiting self</Badge>;
-  return <Badge variant="outline" className="text-[10px]">To do</Badge>;
+  if (status === 'submitted') return <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[12px] font-medium text-emerald-800">Done</span>;
+  if (status === 'draft' || status === 'in_progress') return <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[12px] font-medium text-sky-800">In progress</span>;
+  if (status === 'waiting_self') return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[12px] font-medium text-amber-900">Awaiting self</span>;
+  return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[12px] font-medium text-amber-900">To do</span>;
 }
 
 interface BoomReviewHubProps {
@@ -351,9 +362,7 @@ export default function BoomReviewHub({
   };
 
   function assessorStatusBadge(status: string) {
-    if (status === 'submitted') return <Badge className="text-[10px] bg-emerald-600">Done</Badge>;
-    if (status === 'draft') return <Badge variant="secondary" className="text-[10px]">In progress</Badge>;
-    return <Badge variant="outline" className="text-[10px]">To do</Badge>;
+    return statusBadge(status);
   }
 
   if (!reviewerEmployeeId) {
@@ -371,16 +380,16 @@ export default function BoomReviewHub({
   return (
     <div className="space-y-6 mb-8">
       {/* Reviewer context — each login/email maps to one employee; RPC returns only their assignments */}
-      <div className="glass-panel p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-4 border-primary/10">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-          <UserCircle className="h-5 w-5 text-primary" />
+      <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-sky-50 via-white to-amber-50 p-5 ring-1 ring-sky-100 sm:flex-row sm:items-start">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+          <UserCircle className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold tracking-tight">Your BOOM workspace</h2>
-            <Badge variant="secondary" className="text-[10px] font-normal">
+            <h2 className="font-display text-2xl font-semibold">Your reviews</h2>
+            <span className="rounded-full bg-white px-3 py-1 text-[12px] font-medium text-foreground/80 ring-1 ring-black/5">
               {boomHierarchyLabel(reviewerHierarchyLevel)}
-            </Badge>
+            </span>
           </div>
           <p className="text-sm text-foreground/90">
             <span className="font-semibold">{reviewerName ?? 'Signed-in user'}</span>
@@ -400,22 +409,18 @@ export default function BoomReviewHub({
         </div>
         {assignmentStats.total > 0 && (
           <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end sm:text-right shrink-0">
-            <Badge variant="outline" className="text-[10px] justify-center">
-              {assignmentStats.todo} to do
-            </Badge>
-            <Badge variant="secondary" className="text-[10px] justify-center">
-              {assignmentStats.draft} in progress
-            </Badge>
-            <Badge className="text-[10px] bg-emerald-600/90 justify-center">{assignmentStats.done} submitted</Badge>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-[12px] font-medium text-amber-900">{assignmentStats.todo} to do</span>
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-[12px] font-medium text-sky-800">{assignmentStats.draft} in progress</span>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-800">{assignmentStats.done} submitted</span>
           </div>
         )}
       </div>
 
       <div className="flex flex-wrap gap-3 items-end">
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">Quarter</label>
+          <label className="text-sm font-medium text-foreground/80">Quarter</label>
           <Select value={periodQuarter} onValueChange={setPeriodQuarter}>
-            <SelectTrigger className="w-[140px] h-9 text-xs">
+            <SelectTrigger className="h-10 w-[140px] rounded-2xl text-sm">
               <SelectValue>{periodQuarter}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -429,11 +434,11 @@ export default function BoomReviewHub({
         </div>
         {showMonthFilter && (
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {hasOwnMonthlySelf ? 'Month (self)' : 'Month (monthly discussions)'}
+          <label className="text-sm font-medium text-foreground/80">
+            {hasOwnMonthlySelf ? 'Month' : 'Month for discussions'}
           </label>
           <Select value={periodMonth} onValueChange={setPeriodMonth}>
-            <SelectTrigger className="w-[140px] h-9 text-xs">
+            <SelectTrigger className="h-10 w-[140px] rounded-2xl text-sm">
               <SelectValue>{periodMonth}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -449,7 +454,7 @@ export default function BoomReviewHub({
         <Button
           variant="outline"
           size="sm"
-          className="h-9"
+          className={softButton}
           disabled={loading}
           onClick={() => {
             void loadAssignments();
@@ -459,39 +464,41 @@ export default function BoomReviewHub({
         >
           Refresh
         </Button>
-        <Badge variant="secondary" className="h-9 px-3 text-xs font-mono">
+        <span className="inline-flex h-10 items-center rounded-full bg-white px-3 text-sm font-medium text-foreground/80 ring-1 ring-black/5">
           Viewing {periodQuarter}
           {showMonthFilter ? ` · ${periodMonth}` : ''}
-        </Badge>
+        </span>
       </div>
 
       <Tabs value={boomTab} onValueChange={setBoomTab} className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-          <TabsTrigger value="tasks" className="text-xs gap-1">
-            <ClipboardList className="w-3 h-3" /> Tasks
+        <div className="app-sticky-subnav -mx-4 bg-background/95 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <TabsList className="flex h-auto flex-wrap gap-2 border-0 bg-transparent p-0">
+          <TabsTrigger value="tasks" className={pillTab}>
+            <ClipboardList className="h-4 w-4" /> Tasks
           </TabsTrigger>
-          <TabsTrigger value="discussions" className="text-xs gap-1">
-            <MessagesSquare className="w-3 h-3" /> Discussions
+          <TabsTrigger value="discussions" className={pillTab}>
+            <MessagesSquare className="h-4 w-4" /> Discussions
           </TabsTrigger>
-          <TabsTrigger value="feedback" className="text-xs gap-1">
-            <TrendingUp className="w-3 h-3" /> My 360 feedback
+          <TabsTrigger value="feedback" className={pillTab}>
+            <TrendingUp className="h-4 w-4" /> My 360 feedback
           </TabsTrigger>
           {!teamMemberView && showCommentsTab && (
-            <TabsTrigger value="comments" className="text-xs gap-1">
-              <MessageSquare className="w-3 h-3" /> Comments
+            <TabsTrigger value="comments" className={pillTab}>
+              <MessageSquare className="h-4 w-4" /> Comments
             </TabsTrigger>
           )}
           {canViewDirectory && (
-            <TabsTrigger value="directory" className="text-xs gap-1">
-              <Users className="w-3 h-3" /> Directory
+            <TabsTrigger value="directory" className={pillTab}>
+              <Users className="h-4 w-4" /> Directory
             </TabsTrigger>
           )}
           {canViewInsights && (
-            <TabsTrigger value="insights" className="text-xs gap-1">
-              <LayoutDashboard className="w-3 h-3" /> Insights
+            <TabsTrigger value="insights" className={pillTab}>
+              <LayoutDashboard className="h-4 w-4" /> Insights
             </TabsTrigger>
           )}
         </TabsList>
+        </div>
 
         <TabsContent value="tasks" className="mt-0 space-y-6">
       <p className="text-xs text-muted-foreground max-w-xl">
@@ -499,52 +506,40 @@ export default function BoomReviewHub({
       </p>
 
       {!teamMemberView && filteredAssessorTasks.length > 0 && (
-        <div className="glass-panel p-5 shadow-sm border-primary/15">
-          <div className="mb-4 space-y-1">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-primary" />
-              <h4 className="text-sm font-semibold">EPA assessor tasks</h4>
-              <span className="text-[10px] text-muted-foreground">({filteredAssessorTasks.length})</span>
+        <section className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="font-display text-lg font-semibold">Assessor tasks</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Independent ratings on executives who have sent their self assessment for {periodQuarter}. These stay separate from their own scores.
+              </p>
             </div>
-            <p className="text-[11px] text-muted-foreground pl-6 leading-snug">
-              Independent 1–5 ratings on executives who have submitted their quarterly executive self assessment for{' '}
-              <span className="font-mono">{periodQuarter}</span>. Stored separately from their self scores.
-            </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium">Executive</th>
-                  <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Role</th>
-                  <th className="pb-2 pr-3 font-medium">Your assessor sheet</th>
-                  <th className="pb-2 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAssessorTasks.map((t) => (
-                  <tr key={t.self_response_id} className="border-b border-border/40 last:border-0">
-                    <td className="py-2.5 pr-3 font-medium">{t.reviewee_name}</td>
-                    <td className="py-2.5 pr-3 hidden sm:table-cell text-muted-foreground text-xs">
-                      {t.reviewee_role ?? '—'}
-                    </td>
-                    <td className="py-2.5 pr-3">{assessorStatusBadge(t.assessor_status)}</td>
-                    <td className="py-2.5 text-right">
-                      <Button
-                        size="sm"
-                        variant={t.assessor_status === 'submitted' ? 'outline' : 'default'}
-                        className="h-8 text-xs"
-                        onClick={() => openAssessorRunner(t)}
-                      >
-                        {t.assessor_status === 'submitted' ? 'View' : t.assessor_status === 'draft' ? 'Continue' : 'Start'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filteredAssessorTasks.map((t) => (
+              <article key={t.self_response_id} className="flex flex-col justify-between gap-3 rounded-2xl bg-muted/40 p-4">
+                <div>
+                  <p className="text-[15px] font-medium">{t.reviewee_name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t.reviewee_role ?? 'Executive'}</p>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  {assessorStatusBadge(t.assessor_status)}
+                  <Button
+                    size="sm"
+                    variant={t.assessor_status === 'submitted' ? 'outline' : 'default'}
+                    className={cn(softButton, t.assessor_status === 'submitted' ? '' : 'bg-teal-500 text-white hover:bg-teal-600')}
+                    onClick={() => openAssessorRunner(t)}
+                  >
+                    {t.assessor_status === 'submitted' ? 'View' : t.assessor_status === 'draft' ? 'Continue' : 'Start'}
+                  </Button>
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+        </section>
       )}
 
       {loading ? (
@@ -563,63 +558,59 @@ export default function BoomReviewHub({
       ) : (
         <div className="space-y-6">
           {sortedFormGroups.map(([code, list]) => (
-            <div key={code} className="glass-panel p-5 shadow-sm">
-              <div className="mb-4 space-y-1">
-                <div className="flex items-center gap-2">
-                  <ClipboardList className="w-4 h-4 text-primary" />
-                  <h4 className="text-sm font-semibold">{FORM_LABELS[code] ?? code}</h4>
-                  <span className="text-[10px] text-muted-foreground">({list.length})</span>
+            <section key={code} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+              <div className="mb-4 flex items-start gap-3">
+                {(() => {
+                  const look = FORM_LOOK[code] ?? { icon: ClipboardList, chip: 'bg-muted text-foreground' };
+                  const Icon = look.icon;
+                  return (
+                    <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', look.chip)}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                  );
+                })()}
+                <div>
+                  <h3 className="font-display text-lg font-semibold">{FORM_LABELS[code] ?? code}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{boomFormPurpose(code)}</p>
                 </div>
-                <p className="text-[11px] text-muted-foreground pl-6 leading-snug">{boomFormPurpose(code)}</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                      <th className="pb-2 pr-3 font-medium">
-                        {code === 'monthly_self' ? 'Person' : 'Reviewee'}
-                      </th>
-                      <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Role</th>
-                      <th className="pb-2 pr-3 font-medium hidden md:table-cell">Dept</th>
-                      <th className="pb-2 pr-3 font-medium">Status</th>
-                      <th className="pb-2 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((a) => (
-                      <tr key={`${a.form_code}-${a.reviewee_id}`} className="border-b border-border/40 last:border-0">
-                        <td className="py-2.5 pr-3 font-medium">
-                          <span>{a.reviewee_name}</span>
-                          {a.form_code === 'monthly_self' && a.reviewee_id === reviewerEmployeeId && (
-                            <Badge variant="outline" className="ml-2 text-[9px] py-0 px-1.5">
-                              You
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="py-2.5 pr-3 hidden sm:table-cell text-muted-foreground text-xs">
-                          {a.reviewee_role ?? '—'}
-                        </td>
-                        <td className="py-2.5 pr-3 hidden md:table-cell text-muted-foreground text-xs">
-                          {a.reviewee_department ?? '—'}
-                        </td>
-                        <td className="py-2.5 pr-3">{statusBadge(a.status)}</td>
-                        <td className="py-2.5 text-right">
-                          <Button size="sm" variant={a.status === 'submitted' ? 'outline' : 'default'} className="h-8 text-xs" onClick={() => void openRunner(a)}>
-                            {a.form_code === 'epa_gceo_assessor' && a.status === 'waiting_self'
-                              ? 'Awaiting self'
-                              : a.status === 'submitted'
-                                ? 'View'
-                                : a.status === 'draft'
-                                  ? 'Continue'
-                                  : 'Start'}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {list.map((a) => (
+                  <article key={`${a.form_code}-${a.reviewee_id}`} className="flex flex-col justify-between gap-3 rounded-2xl bg-muted/40 p-4">
+                    <div>
+                      <p className="text-[15px] font-medium">
+                        {a.reviewee_name}
+                        {a.form_code === 'monthly_self' && a.reviewee_id === reviewerEmployeeId ? (
+                          <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 ring-1 ring-teal-100">You</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {a.reviewee_role ?? 'Role not set'}
+                        {a.reviewee_department ? ` · ${a.reviewee_department}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      {statusBadge(a.status)}
+                      <Button
+                        size="sm"
+                        variant={a.status === 'submitted' || a.status === 'waiting_self' ? 'outline' : 'default'}
+                        className={cn(softButton, a.status === 'submitted' || a.status === 'waiting_self' ? '' : 'bg-teal-500 text-white hover:bg-teal-600')}
+                        disabled={a.status === 'waiting_self'}
+                        onClick={() => void openRunner(a)}
+                      >
+                        {a.status === 'waiting_self'
+                          ? 'Awaiting self'
+                          : a.status === 'submitted'
+                            ? 'View'
+                            : a.status === 'draft'
+                              ? 'Continue'
+                              : 'Start'}
+                      </Button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       )}
@@ -638,13 +629,15 @@ export default function BoomReviewHub({
         </TabsContent>
 
         <TabsContent value="feedback" className="mt-0">
-      <div className="glass-panel p-5 border-accent/10">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-accent" />
-          <h3 className="text-sm font-semibold">My 360 results (about you)</h3>
-          <Badge variant="outline" className="text-[10px]">
+      <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-800">
+            <TrendingUp className="h-4 w-4" />
+          </span>
+          <h3 className="font-display text-lg font-semibold">My 360 results</h3>
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-[12px] font-medium text-muted-foreground">
             {periodQuarter}
-          </Badge>
+          </span>
         </div>
         <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
           Anonymous aggregated peer scores by behaviour section — updates as each colleague submits their 360 about you.

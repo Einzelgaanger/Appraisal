@@ -22,9 +22,9 @@ export function boomPeerFormHint(level: number | null | undefined): string {
 /** Intro copy for the BOOM Tasks tab by hierarchy level. */
 export function boomTasksIntro(level: number | null | undefined): string {
   if (level != null && level >= 2) {
-    return 'Monthly self-reflection and 360 peer reviews for every colleague. If you are a line manager, you will also see EA quarterly manager reviews for your direct reports.';
+    return 'Monthly self-reflection and 360 peer reviews for every colleague. If you are a line manager, you will also see Executive Office Quarterly Evaluations for your direct reports.';
   }
-  return 'Monthly self and performance self follow role rules; 360 peer reviews include every other active EO colleague. EA quarterly manager reviews follow your configured line-manager matrix.';
+  return 'Monthly self and performance self follow role rules; 360 peer reviews include every other active EO colleague. Executive Office Quarterly Evaluations follow your configured line-manager matrix.';
 }
 
 /** Human summary for each assessment form type (reviewer-facing). */
@@ -37,7 +37,7 @@ export function boomFormPurpose(formCode: string): string {
     case 'monthly_self':
       return 'Private monthly reflection — only you and authorised admins see answers.';
     case 'ea_quarterly':
-      return 'Quarterly manager review of your direct reports — only assigned line managers see these.';
+      return 'Executive Office Quarterly Evaluation — only assigned line managers see these.';
     case 'epa_gceo_assessor':
       return 'BOOM-EPA v2 GCEO assessor layer — rate L1 functional leads after they submit their executive self-assessment.';
     default:

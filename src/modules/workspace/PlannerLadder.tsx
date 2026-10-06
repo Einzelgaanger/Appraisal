@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import {
   applyPlannerWeights,
+  createTask,
   deleteKeyResult,
   deleteObjective,
   getPlanner,
@@ -277,11 +278,13 @@ export default function PlannerLadder({
   directory,
   onOpenProject,
   onChanged,
+  onAddProject,
 }: {
   projects: WorkspaceProjectListItem[];
   directory: WorkspaceColleague[];
   onOpenProject: (id: string) => void;
   onChanged?: () => Promise<void> | void;
+  onAddProject?: () => void;
 }) {
   const [board, setBoard] = useState<PlannerBoard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -290,7 +293,7 @@ export default function PlannerLadder({
     unit: false,
     kr: true,
     projects: true,
-    tasks: false,
+    tasks: true,
   });
   const [filters, setFilters] = useState<Record<string, Filter>>({
     company: { ...EMPTY_FILTER },
@@ -303,6 +306,10 @@ export default function PlannerLadder({
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
   const [weighing, setWeighing] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskProjectId, setTaskProjectId] = useState('');
+  const [taskDue, setTaskDue] = useState('');
 
   const load = async () => {
     try {
@@ -420,6 +427,34 @@ export default function PlannerLadder({
   const krLinks = [...new Set(board.key_results.map((row) => row.parent_title).filter((name): name is string => Boolean(name)))].sort();
   const projectLinks = [...new Set(projects.map((row) => row.key_result_title).filter((name): name is string => Boolean(name)))].sort();
   const canEditObjectives = board.can_manage_objectives && (!board.objectives_locked || board.is_leadership);
+  const editableProjects = projects.filter((project) => project.can_edit);
+
+  const openTask = () => {
+    setTaskTitle('');
+    setTaskDue('');
+    setTaskProjectId(editableProjects[0]?.id ?? '');
+    setTaskOpen(true);
+  };
+
+  const saveTask = async () => {
+    if (!taskTitle.trim() || !taskProjectId) return;
+    setSaving(true);
+    try {
+      await createTask({
+        projectId: taskProjectId,
+        title: taskTitle.trim(),
+        dueDate: taskDue || null,
+      });
+      setTaskOpen(false);
+      await load();
+      await onChanged?.();
+      toast.success('Task added');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not add the task');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const openEditor = (kind: 'company' | 'unit' | 'kr', row?: PlannerObjective | PlannerKeyResult) => {
     if (!row) {
@@ -597,6 +632,11 @@ export default function PlannerLadder({
         onFilter={(next) => setFilters((prev) => ({ ...prev, projects: next }))}
         people={people}
         parents={projectLinks}
+        action={(
+          <Button size="sm" variant="outline" className="h-9 gap-1 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal" onClick={() => onAddProject?.()}>
+            <Plus className="h-3.5 w-3.5" /> Add project
+          </Button>
+        )}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
@@ -681,6 +721,11 @@ export default function PlannerLadder({
         people={people}
         parents={taskLinks}
         showNext
+        action={(
+          <Button size="sm" variant="outline" className="h-9 gap-1 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal" onClick={openTask}>
+            <Plus className="h-3.5 w-3.5" /> Add task
+          </Button>
+        )}
       >
         <TaskTable
           rows={taskRows}
@@ -698,6 +743,42 @@ export default function PlannerLadder({
           }}
         />
       </Section>
+
+      <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {editableProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Add a project first. Tasks sit on a project you can edit.</p>
+            ) : (
+              <>
+                <Select value={taskProjectId} onValueChange={setTaskProjectId}>
+                  <SelectTrigger><SelectValue placeholder="Project" /></SelectTrigger>
+                  <SelectContent>
+                    {editableProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input placeholder="What needs to be done" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
+                <Input type="date" value={taskDue} onChange={(event) => setTaskDue(event.target.value)} />
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTaskOpen(false)}>Cancel</Button>
+            {editableProjects.length === 0 ? (
+              <Button onClick={() => { setTaskOpen(false); onAddProject?.(); }}>Add project</Button>
+            ) : (
+              <Button disabled={saving || !taskTitle.trim() || !taskProjectId} onClick={() => void saveTask()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add task'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editor !== null} onOpenChange={(next) => { if (!next) setEditor(null); }}>
         <DialogContent>

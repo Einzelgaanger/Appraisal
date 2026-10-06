@@ -31,14 +31,38 @@ import GhcFeedbackDiscussion from './GhcFeedbackDiscussion';
 import { resolveMonthPeriod } from '@/lib/boomPeriods';
 import { supabase } from '@/integrations/supabase/client';
 
+const CHECKIN_COMMENT_LABELS: Record<string, string> = {
+  time_off_this_quarter: 'Time off',
+  looking_forward_personal: 'Looking forward (personal)',
+  looking_forward_work: 'Looking forward (work)',
+  meeting_okrs: 'Meeting OKRs',
+  displaying_growth: 'Growth',
+  strong_relationship: 'Relationship with manager',
+  proud_this_month: 'Proud this month',
+  personal_issues: 'Personal issues',
+  company_can_help: 'Company can help',
+  motivated: 'Motivation',
+  fulfilled: 'Fulfilment',
+};
+
+function commentLines(raw: unknown) {
+  if (!raw || typeof raw !== 'object') return [];
+  return Object.entries(raw as Record<string, unknown>)
+    .map(([key, value]) => ({ key, label: CHECKIN_COMMENT_LABELS[key] ?? key, text: String(value ?? '').trim() }))
+    .filter((row) => row.text);
+}
+import QuarterScoreHistory from '@/components/employee-dashboard/QuarterScoreHistory';
+
 export default function GhcMyResults({
   periodQuarter,
   acknowledgeTask,
   onAcknowledged,
+  onPeriodChange,
 }: {
   periodQuarter: string;
   acknowledgeTask: GhcTaskRow | null;
   onAcknowledged: () => void;
+  onPeriodChange?: (period: string) => void;
 }) {
   const [searchParams] = useSearchParams();
   const periodMonth = resolveMonthPeriod(searchParams.get('ghcMonth'));
@@ -166,8 +190,13 @@ export default function GhcMyResults({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading results…
+      <div className="space-y-5">
+        {onPeriodChange && (
+          <QuarterScoreHistory activePeriod={periodQuarter} onSelect={onPeriodChange} />
+        )}
+        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading results…
+        </div>
       </div>
     );
   }
@@ -193,19 +222,20 @@ export default function GhcMyResults({
 
   return (
     <div className="space-y-5">
+      {onPeriodChange && (
+        <QuarterScoreHistory activePeriod={periodQuarter} onSelect={onPeriodChange} />
+      )}
       <div className="glass-panel p-5">
         <div className="mb-3 flex items-center gap-2">
           <h3 className="text-sm font-semibold">Anonymous peer 360</h3>
           <Badge variant="outline" className="text-[10px]">{periodQuarter}</Badge>
         </div>
-        {!agg?.released ? (
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Not visible yet — People Ops opens this quarter from Appraisal → Monitor → “Release peer 360”.{' '}
-            {agg?.peerCount ? `${agg.peerCount} peer review(s) already in.` : 'No submitted reviews yet.'}{' '}
-            Your anonymous scores appear after release; reviewer names stay with People Ops only.
+        {!agg?.scores?.length ? (
+          <p className="text-xs text-muted-foreground">
+            No scores yet for this quarter.
+            {agg?.peerCount ? ` ${agg.peerCount} peer review(s) are in, and scores appear here for everyone at the same time.` : ' Anonymous scores appear here for everyone as soon as peers submit.'}
+            {' '}Reviewer names stay with People Ops only.
           </p>
-        ) : !agg.scores?.length ? (
-          <p className="text-xs text-muted-foreground">Released, but no scores yet for this quarter.</p>
         ) : (
           <div className="space-y-4">
             <p className="text-[11px] text-muted-foreground">Based on {agg.peerCount} anonymous peer review(s).</p>
@@ -267,6 +297,12 @@ export default function GhcMyResults({
                 {row.policy_feedback ? (
                   <p className="text-xs whitespace-pre-wrap">{String(row.policy_feedback)}</p>
                 ) : null}
+                {commentLines(row.question_comments).map((item) => (
+                  <p key={item.key} className="text-xs whitespace-pre-wrap">
+                    <span className="font-medium">{item.label}: </span>
+                    <span className="text-muted-foreground">{item.text}</span>
+                  </p>
+                ))}
                 <GhcFeedbackDiscussion
                   kind="monthly_self"
                   subjectId={String(row.employee_id)}

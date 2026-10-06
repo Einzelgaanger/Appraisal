@@ -27,7 +27,7 @@ export default function WorkspacePortalEditorial({
       <div className="shrink-0 border-t border-border/60 bg-card/60 px-6 py-5 backdrop-blur-sm xl:px-8 xl:py-6">
         {figure ? (
           <div className="flex items-baseline gap-3">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{figure}</span>
+            <span className="text-sm font-medium text-teal-800">{figure}</span>
             <div className="h-px flex-1 bg-border" />
           </div>
         ) : (

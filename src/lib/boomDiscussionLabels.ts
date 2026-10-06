@@ -30,7 +30,7 @@ export function isBoomOversightViewer(
 export const DISCUSSION_FORM_LABELS: Record<string, string> = {
   monthly_self: 'Monthly self check-in',
   executive: 'Executive assessment',
-  ea_quarterly: 'EA quarterly evaluation',
+  ea_quarterly: 'Executive Office Quarterly Evaluation',
   peer_360: '360 peer review (chat with manager)',
 };
 

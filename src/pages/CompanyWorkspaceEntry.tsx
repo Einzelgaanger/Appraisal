@@ -88,7 +88,7 @@ export default function CompanyWorkspaceEntry() {
           {apexLink && (
             <a
               href={apexLink}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground sm:text-[10px]"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-white px-3 py-1.5 text-sm text-muted-foreground ring-1 ring-black/5 hover:text-foreground"
             >
               <ArrowLeft className="h-3 w-3" />
               All companies
@@ -109,15 +109,13 @@ export default function CompanyWorkspaceEntry() {
           <p className="mt-3 text-[11px] text-muted-foreground">{brand.parentCredit}</p>
         ) : null}
         <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Sign in to continue.</p>
-        <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          Cycle {cycle}
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Cycle {cycle}</p>
 
         <div className="mt-6 flex flex-col gap-2">
-          <Button variant="green" size="lg" className="h-11 w-full rounded-xl text-sm shadow-md sm:h-12" asChild>
+          <Button variant="green" size="lg" className="h-11 w-full rounded-2xl bg-teal-500 font-sans text-sm font-medium normal-case tracking-normal text-white shadow-sm hover:bg-teal-600 sm:h-12" asChild>
             <Link to={loginTo}>Sign in</Link>
           </Button>
-          <Button variant="outline" size="lg" className="h-10 w-full rounded-xl border-border/80 bg-card/60 text-xs backdrop-blur-sm sm:text-sm" asChild>
+          <Button variant="outline" size="lg" className="h-11 w-full rounded-2xl border-border/80 bg-card/60 font-sans text-sm font-medium normal-case tracking-normal" asChild>
             <Link to={`/find-account?tenant=${tenant.slug}`}>
               <KeyRound className="mr-1.5 h-3.5 w-3.5" />
               Find account / reset password

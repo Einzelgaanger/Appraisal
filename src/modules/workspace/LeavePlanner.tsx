@@ -18,6 +18,7 @@ import { companyDirectory, type WorkspaceColleague } from '@/modules/workspace/w
 import {
   cancelLeave,
   decideLeave,
+  LEAVE_ALLOWANCE,
   placeLeave,
   isActiveLeave,
   listLeave,
@@ -79,6 +80,15 @@ function overlapsDay(row: LeaveRequest, day: string) {
   return isActiveLeave(row.status) && row.start_date <= day && row.end_date >= day;
 }
 
+/** Annual and the other types reset each quarter. Maternity resets each calendar year. */
+function allowanceWindow(type: LeaveType, startDate: string) {
+  if (!startDate || startDate.length < 7) return 'unknown';
+  if (type === 'maternity') return startDate.slice(0, 4);
+  const month = Number(startDate.slice(5, 7));
+  if (!month) return 'unknown';
+  return `${startDate.slice(0, 4)}-Q${Math.floor((month - 1) / 3) + 1}`;
+}
+
 type EnrichedLeave = LeaveRequest & {
   availableBefore: number;
   selectedDays: number;
@@ -86,15 +96,17 @@ type EnrichedLeave = LeaveRequest & {
   usedFullQuarter: boolean;
 };
 
-function enrichLeave(rows: LeaveRequest[], allowance: number): EnrichedLeave[] {
+function enrichLeave(rows: LeaveRequest[]): EnrichedLeave[] {
   const groups = new Map<string, LeaveRequest[]>();
   for (const row of rows) {
-    const list = groups.get(row.employee_id) ?? [];
+    const key = `${row.employee_id}:${row.leave_type}:${allowanceWindow(row.leave_type, row.start_date)}`;
+    const list = groups.get(key) ?? [];
     list.push(row);
-    groups.set(row.employee_id, list);
+    groups.set(key, list);
   }
   const stats = new Map<string, { availableBefore: number; balanceAfter: number }>();
   for (const list of groups.values()) {
+    const allowance = LEAVE_ALLOWANCE[list[0]?.leave_type] ?? 5;
     const ordered = list
       .filter((row) => row.status !== 'cancelled')
       .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.start_date.localeCompare(b.start_date));
@@ -107,6 +119,7 @@ function enrichLeave(rows: LeaveRequest[], allowance: number): EnrichedLeave[] {
     }
   }
   return rows.map((row) => {
+    const allowance = LEAVE_ALLOWANCE[row.leave_type] ?? 5;
     const days = row.day_count || workingDays(row.start_date, row.end_date);
     const found = stats.get(row.id) ?? { availableBefore: allowance, balanceAfter: allowance };
     return {
@@ -121,14 +134,16 @@ function enrichLeave(rows: LeaveRequest[], allowance: number): EnrichedLeave[] {
 
 function approvalWord(status: LeaveStatus) {
   if (status === 'declined') return 'Denied';
-  if (status === 'pending') return 'Pending';
+  if (status === 'pending') return 'With HR';
+  if (status === 'hr_approved') return 'With manager';
+  if (status === 'manager_approved') return 'With HR';
   return 'Approved';
 }
 
 function lifeWord(row: LeaveRequest) {
   const today = iso(new Date());
   if (row.status === 'declined') return 'Denied';
-  if (row.status === 'pending' || row.status === 'manager_approved') return 'Pending';
+  if (row.status === 'pending' || row.status === 'hr_approved' || row.status === 'manager_approved') return 'Pending';
   if (row.end_date < today) return 'Completed';
   if (row.start_date <= today) return 'In progress';
   return 'Booked';
@@ -236,9 +251,10 @@ export default function LeavePlanner({ employeeId }: Props) {
     );
   }, [balance?.department, editingId, endDate, people, requestedDays, rows, startDate, subjectId]);
 
-  const outsideWindow =
+  const outsideWindow = leaveType === 'annual' && (
     Boolean(startDate && balance?.allowed_start && startDate < balance.allowed_start) ||
-    Boolean(endDate && balance?.allowed_end && endDate > balance.allowed_end);
+    Boolean(endDate && balance?.allowed_end && endDate > balance.allowed_end)
+  );
 
   const resetForm = () => {
     setNote('');
@@ -273,14 +289,14 @@ export default function LeavePlanner({ employeeId }: Props) {
 
   const handleCreate = async () => {
     if (!startDate || !endDate) return;
-    if (!editingId && !placingForOther && requestedDays > 0) {
-      const left = Math.max(0, (balance?.remaining ?? 10) - requestedDays);
+    if (!editingId && !placingForOther && leaveType === 'annual' && requestedDays > 0) {
+      const left = Math.max(0, (balance?.balances?.annual?.remaining ?? balance?.remaining ?? 10) - requestedDays);
       if (left === 0 && fullQuarter !== 'yes') {
-        toast.error('This block uses the rest of your 10 days. Answer yes, then submit.');
+        toast.error('This block uses the rest of your annual days. Answer yes, then submit.');
         return;
       }
       if (left > 0 && fullQuarter !== 'no') {
-        toast.error('You still have days left this quarter. Answer no, then file another form for the rest.');
+        toast.error('You still have annual days left this quarter. Answer no, then file another form for the rest.');
         return;
       }
     }
@@ -296,14 +312,10 @@ export default function LeavePlanner({ employeeId }: Props) {
           note: note.trim() || undefined,
           requestId: editingId,
         });
-        toast.success(editingId ? 'Leave moved' : 'Leave placed and approved');
+        toast.success(editingId ? 'Leave moved' : 'Leave placed. HR is done; the line manager is next when there is one.');
       } else {
         await requestLeave({ leaveType, startDate, endDate, note: note.trim() || undefined });
-        toast.success(
-          balance?.manager_name
-            ? `Submitted to ${balance.manager_name} for line-manager approval`
-            : 'Submitted for HR review',
-        );
+        toast.success('Submitted to HR by email and on the leave planner. Your manager sees it after HR clears it.');
       }
       resetForm();
       setPage('all');
@@ -344,8 +356,8 @@ export default function LeavePlanner({ employeeId }: Props) {
     );
   }
 
-  const remaining = balance?.remaining ?? 10;
-  const allowance = balance?.allowance ?? 10;
+  const typeAllowance = balance?.balances?.[leaveType]?.allowance ?? LEAVE_ALLOWANCE[leaveType];
+  const remaining = balance?.balances?.[leaveType]?.remaining ?? (leaveType === 'annual' ? balance?.remaining ?? typeAllowance : typeAllowance);
   const editingRow = rows.find((row) => row.id === editingId) ?? null;
   const selectedPerson = people.find((person) => person.id === subjectId) ?? null;
   const formName = editingRow?.employee_name
@@ -354,12 +366,13 @@ export default function LeavePlanner({ employeeId }: Props) {
   const formTeam = editingRow?.department
     || (placingForOther ? selectedPerson?.department : balance?.department)
     || 'Unassigned';
+  const subjectWindow = allowanceWindow(leaveType, startDate);
   const subjectUsed = rows
-    .filter((row) => row.employee_id === subjectId && row.id !== editingId && isActiveLeave(row.status))
+    .filter((row) => row.employee_id === subjectId && row.leave_type === leaveType && row.id !== editingId && isActiveLeave(row.status) && allowanceWindow(row.leave_type, row.start_date) === subjectWindow)
     .reduce((sum, row) => sum + (row.day_count || workingDays(row.start_date, row.end_date)), 0);
-  const formRemaining = placingForOther || editingId ? Math.max(0, allowance - subjectUsed) : remaining;
+  const formRemaining = placingForOther || editingId ? Math.max(0, typeAllowance - subjectUsed) : remaining;
   const remainingAfter = Math.max(0, formRemaining - requestedDays);
-  const enriched = enrichLeave(rows, allowance);
+  const enriched = enrichLeave(rows);
   const shown = enriched.filter((row) => {
     if (page === 'approved') return row.status === 'approved';
     if (page === 'team' && teamFilter !== 'all') return (row.department || 'Unassigned') === teamFilter;
@@ -397,12 +410,15 @@ export default function LeavePlanner({ employeeId }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-teal-50 via-white to-amber-50 px-4 py-3 ring-1 ring-teal-100">
         <p className="text-sm text-foreground/80">
           <span className="font-display text-2xl font-semibold text-foreground">{formRemaining}</span>
-          <span className="ml-2">of {allowance} working days left{balance?.period ? ` · ${balance.period}` : ''}</span>
+          <span className="ml-2">
+            {TYPE_LABEL[leaveType]} days left
+            {leaveType === 'maternity' ? ' this year' : balance?.period ? ` · ${balance.period}` : ''}
+            . Each type stands on its own.
+          </span>
         </p>
         <Button
           onClick={openRequest}
           className={cn(softButton, 'gap-2 bg-teal-500 text-white hover:bg-teal-600')}
-          disabled={!balance?.submit_open && !isHr}
         >
           <Plus className="h-4 w-4" />
           New
@@ -421,8 +437,8 @@ export default function LeavePlanner({ employeeId }: Props) {
                 {page === 'calendar'
                   ? 'Each block shows the person, the dates, the leave type, how many days, and their team.'
                   : page === 'approved'
-                    ? 'Leave that has cleared both the line manager and HR.'
-                    : 'Name, dates, whether the 10 days are used up, days available, days in this form, balance left, when it was sent, type, manager, both approvals, team, and where the leave stands.'}
+                    ? 'Approved leave on a calendar, then the same rows in the list. A request is approved only after HR and then the line manager.'
+                    : 'Each leave type has its own balance. HR sees the request first, on the planner and by email, and the line manager sees it after HR clears it.'}
               </p>
             </div>
             {page === 'team' && (
@@ -439,7 +455,7 @@ export default function LeavePlanner({ employeeId }: Props) {
               </Select>
             )}
           </div>
-          {page === 'calendar' ? (
+          {(page === 'calendar' || page === 'approved') ? (
             <>
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-display text-lg font-semibold">
@@ -480,7 +496,11 @@ export default function LeavePlanner({ employeeId }: Props) {
               <div className="grid min-w-[980px] grid-cols-7 gap-1.5">
                 {cells.map((day, i) => {
                   if (!day) return <div key={`e-${i}`} />;
-                  const peopleOut = rows.filter((row) => overlapsDay(row, day));
+                  const peopleOut = rows.filter((row) =>
+                    page === 'approved'
+                      ? row.status === 'approved' && row.start_date <= day && row.end_date >= day
+                      : overlapsDay(row, day),
+                  );
                   const isToday = day === today;
                   return (
                     <div
@@ -532,10 +552,26 @@ export default function LeavePlanner({ employeeId }: Props) {
                 })}
               </div>
               </div>
+              {page === 'approved' && (
+                <div className="mt-6">
+                  {shown.length === 0 ? (
+                    <p className="py-6 text-sm text-muted-foreground">No approved leave yet.</p>
+                  ) : (
+                    <LeaveTable
+                      rows={shown}
+                      employeeId={employeeId}
+                      isHr={isHr}
+                      onCancel={handleCancel}
+                      onMove={openMove}
+                      onDecide={handleDecide}
+                    />
+                  )}
+                </div>
+              )}
             </>
           ) : shown.length === 0 ? (
             <p className="py-10 text-sm text-muted-foreground">
-              {page === 'approved' ? 'No approved leave yet.' : page === 'team' ? 'No leave for this team.' : 'No submissions yet.'}
+              {page === 'team' ? 'No leave for this team.' : 'No submissions yet.'}
             </p>
           ) : (
             <LeaveTable
@@ -556,10 +592,9 @@ export default function LeavePlanner({ employeeId }: Props) {
             {editingId ? 'Move leave' : placingForOther ? 'Place leave' : 'Leave planner'}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            Each person has 10 working days in the quarter. Take them as one block, or split them and fill this form once for each block.
-            You cannot choose the first two weeks or the last two weeks of the quarter. Every leave day has to be approved by your line manager before it takes effect,
-            and the days must be in before the end of week 2. If the days are not selected in time, they are placed later, on dates that are still free, so people on the same team are not out together.
-            Agree the dates with your line manager before you send the form.
+            Each leave type stands alone. Annual leave is 10 working days in the quarter and does not use up sick, compassionate, maternity, parental, study, unpaid, or other leave.
+            Annual leave cannot fall in the first two weeks or the last two weeks of the quarter, and it has to be in before the end of week 2.
+            Every request goes to HR first, by email and on this planner, and only then to your line manager.
           </p>
           <div className="mt-5 max-w-3xl space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -612,9 +647,11 @@ export default function LeavePlanner({ employeeId }: Props) {
             </fieldset>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Available number of leave days</Label>
+                <Label>Available {TYPE_LABEL[leaveType].toLowerCase()} days</Label>
                 <Input value={String(formRemaining)} disabled readOnly />
-                <p className="text-[12px] text-muted-foreground">Annual leave is not more than 10 working days a quarter. If you are filing again, this is what is still left.</p>
+                <p className="text-[12px] text-muted-foreground">
+                  {TYPE_LABEL[leaveType]} allows {typeAllowance} working days{leaveType === 'maternity' ? ' this year' : ' this quarter'}, separate from every other type.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Number of leave days selected in this form</Label>
@@ -631,8 +668,8 @@ export default function LeavePlanner({ employeeId }: Props) {
                 <Input
                   id="leave-start"
                   type="date"
-                  min={balance?.allowed_start}
-                  max={balance?.allowed_end}
+                  min={leaveType === 'annual' ? balance?.allowed_start : undefined}
+                  max={leaveType === 'annual' ? balance?.allowed_end : undefined}
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                 />
@@ -642,20 +679,22 @@ export default function LeavePlanner({ employeeId }: Props) {
                 <Input
                   id="leave-end"
                   type="date"
-                  min={balance?.allowed_start}
-                  max={balance?.allowed_end}
+                  min={leaveType === 'annual' ? balance?.allowed_start : startDate || undefined}
+                  max={leaveType === 'annual' ? balance?.allowed_end : undefined}
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">You can only select an aggregate of 10 working days in each quarter.</p>
-            {!editingId && !placingForOther && (
+            {leaveType === 'annual' && (
+              <p className="text-xs text-muted-foreground">Annual leave is capped at 10 working days in each quarter. Other types do not draw from that cap.</p>
+            )}
+            {!editingId && !placingForOther && leaveType === 'annual' && (
               <fieldset className="space-y-2">
                 <legend className="text-sm font-medium">Have you selected up to 10 working days in this quarter?</legend>
                 <p className="text-[12px] leading-relaxed text-muted-foreground">
-                  If this block uses the days you have left, answer yes and submit. You will hear when your line manager approves.
-                  If days are still left, answer no and fill out another form for the rest.
+                  If this block uses the annual days you have left, answer yes and submit. HR reviews it first, then your line manager.
+                  If annual days are still left, answer no and fill out another form for the rest.
                 </p>
                 <div className="flex gap-3">
                   {(['yes', 'no'] as const).map((value) => (
@@ -672,7 +711,7 @@ export default function LeavePlanner({ employeeId }: Props) {
                 </div>
               </fieldset>
             )}
-            {!balance?.submit_open && !isHr && !editingId && (
+            {leaveType === 'annual' && !balance?.submit_open && !isHr && !editingId && (
               <p className="text-xs text-amber-800">
                 The week-2 window closed on {formatDate(balance?.submit_deadline)}. HR can still place or move the days that are left.
               </p>
@@ -712,10 +751,11 @@ export default function LeavePlanner({ employeeId }: Props) {
                 !startDate ||
                 !endDate ||
                 requestedDays <= 0 ||
-                (!editingId && !placingForOther && (requestedDays > formRemaining || !fullQuarter)) ||
+                (!editingId && !placingForOther && requestedDays > formRemaining) ||
+                (!editingId && !placingForOther && leaveType === 'annual' && !fullQuarter) ||
                 Boolean(dateConflict) ||
                 outsideWindow ||
-                (!editingId && !placingForOther && !isHr && balance?.submit_open === false)
+                (!editingId && !placingForOther && leaveType === 'annual' && !isHr && balance?.submit_open === false)
               }
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
@@ -750,7 +790,7 @@ function LeaveTable({
             {[
               'Full name',
               'Leave dates',
-              'Up to 10 days',
+              'Type used up',
               'Days available',
               'Days in this form',
               'Leave balance',
@@ -770,9 +810,13 @@ function LeaveTable({
         <tbody>
           {rows.map((row) => {
             const mine = row.employee_id === employeeId;
-            const canManager = row.status === 'pending' && row.manager_id === employeeId;
-            const canHr = isHr && (row.status === 'manager_approved' || (row.status === 'pending' && !row.manager_id));
-            const hrLabel = row.status === 'approved' ? 'Approved' : row.status === 'declined' ? 'Denied' : row.status === 'manager_approved' ? 'Waiting' : 'Not yet';
+            const canHr = isHr && (row.status === 'pending' || row.status === 'manager_approved');
+            const canManager = row.status === 'hr_approved' && row.manager_id === employeeId;
+            const hrLabel = row.status === 'approved' || row.status === 'hr_approved'
+              ? 'Cleared'
+              : row.status === 'declined'
+                ? 'Denied'
+                : 'Waiting';
             return (
               <tr key={row.id} className="bg-muted/30">
                 <td className="whitespace-nowrap rounded-l-xl px-2 py-2.5 font-medium">{row.employee_name}</td>
@@ -791,7 +835,7 @@ function LeaveTable({
                     {TYPE_LABEL[row.leave_type] || row.leave_type}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-2 py-2.5">{row.manager_name || 'HR'}</td>
+                <td className="whitespace-nowrap px-2 py-2.5">{row.manager_name || 'After HR'}</td>
                 <td className="px-2 py-2.5">
                   <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', lifeClass(approvalWord(row.status)))}>
                     {approvalWord(row.status)}

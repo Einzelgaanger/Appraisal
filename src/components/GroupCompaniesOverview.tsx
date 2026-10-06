@@ -130,7 +130,7 @@ export default function GroupCompaniesOverview({
           return (
             <div key={row.employee_id} className="glass-panel p-5 flex flex-col gap-3">
               <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">{row.tenant_slug ?? '—'}</p>
+                <p className="text-sm text-muted-foreground">{row.tenant_slug ?? '—'}</p>
                 <h3 className="text-lg font-semibold">{row.company_name}</h3>
                 {row.employee_role && (
                   <p className="text-xs text-muted-foreground mt-0.5">Your role: {row.employee_role}</p>
@@ -154,11 +154,7 @@ export default function GroupCompaniesOverview({
                     <p className="text-[10px] text-muted-foreground">Evaluations in</p>
                   </div>
                   <div className="flex items-start">
-                    {g.peer360ReleasedAt ? (
-                      <Badge className="text-[10px]">360 released</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px]">360 not released</Badge>
-                    )}
+                    <Badge className="text-[10px]">360 visible to everyone</Badge>
                   </div>
                 </div>
               )}
@@ -174,11 +170,7 @@ export default function GroupCompaniesOverview({
                     <p className="text-[10px] text-muted-foreground">Executive roster</p>
                   </div>
                   <div className="col-span-2">
-                    {x.peer360Released ? (
-                      <Badge className="text-[10px]">Results released to team</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px]">360 results gated</Badge>
-                    )}
+                    <Badge className="text-[10px]">360 visible to everyone</Badge>
                   </div>
                 </div>
               )}

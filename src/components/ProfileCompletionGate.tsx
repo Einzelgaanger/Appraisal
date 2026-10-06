@@ -28,12 +28,16 @@ import {
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import { GHC_SUBSIDIARY_ID, VIGIPAY_SUBSIDIARY_ID } from '@/tenants/config';
+import { asStringList, extrasExcept } from '@/lib/personCoverage';
+import CoverageEditor from '@/components/org/CoverageEditor';
 
 interface Subsidiary { id: string; name: string; hierarchy_lower_is_senior?: boolean; }
 interface EmployeeOption {
   name: string;
   role: string | null;
+  additional_roles?: string[] | null;
   department: string | null;
+  additional_departments?: string[] | null;
   subsidiary_id: string;
   hierarchy_level: number | null;
   email: string | null;
@@ -42,7 +46,9 @@ interface EmployeeOption {
 interface ProfileDraft {
   name: string;
   role: string;
+  extraRoles: string[] | null;
   department: string;
+  extraDepartments: string[] | null;
   subsidiaryId: string;
   hierarchyLevel: string;
 }
@@ -80,7 +86,9 @@ const readDraft = (userId: string | undefined): ProfileDraft | null => {
     return {
       name: typeof parsed.name === 'string' ? parsed.name : '',
       role: typeof parsed.role === 'string' ? parsed.role : '',
+      extraRoles: Array.isArray(parsed.extraRoles) ? asStringList(parsed.extraRoles) : null,
       department: typeof parsed.department === 'string' ? parsed.department : '',
+      extraDepartments: Array.isArray(parsed.extraDepartments) ? asStringList(parsed.extraDepartments) : null,
       subsidiaryId: typeof parsed.subsidiaryId === 'string' ? parsed.subsidiaryId : '',
       hierarchyLevel: typeof parsed.hierarchyLevel === 'string' ? parsed.hierarchyLevel : '',
     };
@@ -107,7 +115,9 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [extraRoles, setExtraRoles] = useState<string[]>([]);
   const [department, setDepartment] = useState('');
+  const [extraDepartments, setExtraDepartments] = useState<string[]>([]);
   const [subsidiaryId, setSubsidiaryId] = useState('');
   const [hierarchyLevel, setHierarchyLevel] = useState('');
   const [loadingOptions, setLoadingOptions] = useState(true);
@@ -136,10 +146,18 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
   useEffect(() => {
     const loadOptions = async () => {
       setLoadingOptions(true);
-      const [subRes, empRes] = await Promise.all([
-        supabase.from('subsidiaries').select('id, name, hierarchy_lower_is_senior').order('name'),
-        supabase.from('employees').select('name, role, department, subsidiary_id, hierarchy_level, email').order('name'),
-      ]);
+      const db = supabase as any;
+      const subRes = await supabase.from('subsidiaries').select('id, name, hierarchy_lower_is_senior').order('name');
+      let empRes = await db
+        .from('employees')
+        .select('name, role, additional_roles, department, additional_departments, subsidiary_id, hierarchy_level, email')
+        .order('name');
+      if (empRes.error) {
+        empRes = await supabase
+          .from('employees')
+          .select('name, role, department, subsidiary_id, hierarchy_level, email')
+          .order('name');
+      }
       setSubsidiaries(subRes.data ?? []);
       setEmployees(empRes.data ?? []);
       setLoadingOptions(false);
@@ -165,14 +183,12 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     const seedIsGhc = seedSubsidiary === GHC_SUBSIDIARY_ID || tenant.appraisalMode === 'ghc';
     const seedIsVigipay = seedSubsidiary === VIGIPAY_SUBSIDIARY_ID || tenant.appraisalMode === 'vigipay';
 
+    const rawDepartment = (profile?.department ?? matched?.department ?? '').trim();
+    const rawRole = (profile?.role ?? matched?.role ?? '').trim();
     const seedDepartment = draft?.department
-      || (seedIsGhc
-        ? pickCanonical(profile?.department ?? matched?.department, GHC_DEPARTMENTS)
-        : (profile?.department ?? matched?.department ?? ''));
+      || (seedIsGhc ? (pickCanonical(rawDepartment, GHC_DEPARTMENTS) || rawDepartment) : rawDepartment);
     const seedRole = draft?.role
-      || (seedIsGhc
-        ? pickCanonical(profile?.role ?? matched?.role, GHC_ROLES)
-        : (profile?.role ?? matched?.role ?? ''));
+      || (seedIsGhc ? (pickCanonical(rawRole, GHC_ROLES) || rawRole) : rawRole);
     const seedLevel = draft?.hierarchyLevel
       || ((seedIsGhc || seedIsVigipay)
         ? normalizeGhcLevelForForm(profile?.hierarchy_level ?? matched?.hierarchy_level)
@@ -181,7 +197,9 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     setName(draft?.name || profile?.name || matched?.name || '');
     setSubsidiaryId(seedSubsidiary);
     setDepartment(seedDepartment);
+    setExtraDepartments(draft?.extraDepartments ?? extrasExcept(seedDepartment, asStringList(matched?.additional_departments)));
     setRole(seedRole);
+    setExtraRoles(draft?.extraRoles ?? extrasExcept(seedRole, asStringList(matched?.additional_roles)));
     setHierarchyLevel(seedLevel);
     hydratedRef.current = true;
   }, [
@@ -198,8 +216,8 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
   // Persist in-progress answers so leaving / refreshing does not wipe them.
   useEffect(() => {
     if (!needsCompletion || !hydratedRef.current || !userId) return;
-    writeDraft(userId, { name, role, department, subsidiaryId, hierarchyLevel });
-  }, [needsCompletion, userId, name, role, department, subsidiaryId, hierarchyLevel]);
+    writeDraft(userId, { name, role, extraRoles, department, extraDepartments, subsidiaryId, hierarchyLevel });
+  }, [needsCompletion, userId, name, role, extraRoles, department, extraDepartments, subsidiaryId, hierarchyLevel]);
 
   const departmentOptions = useMemo(() => {
     if (ghcContext) {
@@ -284,11 +302,11 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
     }
 
     if (ghcContext) {
-      if (!pickCanonical(department, GHC_DEPARTMENTS)) {
+      if (!pickCanonical(department, GHC_DEPARTMENTS) && !departmentOptions.includes(department.trim())) {
         toast.error('Please pick a GreenHouse Capital team from the list.');
         return;
       }
-      if (!pickCanonical(role, GHC_ROLES)) {
+      if (!pickCanonical(role, GHC_ROLES) && !roleOptions.includes(role.trim())) {
         toast.error('Please pick a GreenHouse Capital role from the list.');
         return;
       }
@@ -305,7 +323,9 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
       body: {
         name,
         role: pickCanonical(role, GHC_ROLES) || role,
+        additional_roles: extrasExcept(role, extraRoles),
         department: pickCanonical(department, VIGIPAY_DEPARTMENTS) || pickCanonical(department, GHC_DEPARTMENTS) || department,
+        additional_departments: extrasExcept(department, extraDepartments),
         subsidiary_id: subsidiaryId,
         hierarchy_level: Number(hierarchyLevel),
       },
@@ -454,6 +474,17 @@ export default function ProfileCompletionGate({ children }: { children: ReactNod
                       </>
                     )}
                   </div>
+
+                  <CoverageEditor
+                    primaryDepartment={department}
+                    primaryRole={role}
+                    departmentOptions={departmentOptions}
+                    roleOptions={roleOptions}
+                    extraDepartments={extraDepartments}
+                    extraRoles={extraRoles}
+                    onDepartments={setExtraDepartments}
+                    onRoles={setExtraRoles}
+                  />
 
                   <div className="space-y-2">
                     <Label>Seniority level</Label>
