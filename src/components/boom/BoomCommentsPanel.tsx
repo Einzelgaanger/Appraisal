@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 type Row = {
   reviewee_id: string;
@@ -13,6 +14,7 @@ type Row = {
   reviewee_department: string | null;
   comment_id: string | null;
   status: string;
+  comment_text?: string | null;
 };
 
 interface BoomCommentsPanelProps {
@@ -33,6 +35,7 @@ export default function BoomCommentsPanel({
   const [received, setReceived] = useState<{ comment_text: string }[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const savedText = useRef<Record<string, string>>({});
 
   const loadGive = useCallback(async () => {
     if (!reviewerEmployeeId || !givesComments) {
@@ -47,7 +50,12 @@ export default function BoomCommentsPanel({
       setToGive([]);
       return;
     }
-    setToGive((data ?? []) as Row[]);
+    const rows = (data ?? []) as Row[];
+    setToGive(rows);
+    const next: Record<string, string> = {};
+    for (const row of rows) next[row.reviewee_id] = row.comment_text ?? '';
+    savedText.current = next;
+    setDrafts(next);
   }, [reviewerEmployeeId, periodQuarter, givesComments]);
 
   const loadReceived = useCallback(async () => {
@@ -90,6 +98,7 @@ export default function BoomCommentsPanel({
         onConflict: 'reviewer_employee_id,reviewee_employee_id,period',
       });
       if (error) throw error;
+      savedText.current[row.reviewee_id] = text;
       toast.success(submit ? 'Comment submitted' : 'Draft saved');
       await loadGive();
     } catch (e: unknown) {
@@ -98,6 +107,30 @@ export default function BoomCommentsPanel({
       setSaving(null);
     }
   };
+
+  const saveChangedDrafts = async () => {
+    if (!reviewerEmployeeId) return;
+    for (const row of toGive) {
+      if (row.status === 'submitted') continue;
+      const text = (drafts[row.reviewee_id] ?? '').trim();
+      if (!text || text === (savedText.current[row.reviewee_id] ?? '').trim()) continue;
+      const { error } = await supabase.from('assessment_peer_comments').upsert({
+        reviewer_employee_id: reviewerEmployeeId,
+        reviewee_employee_id: row.reviewee_id,
+        period: periodQuarter,
+        comment_text: text,
+        status: 'draft',
+        submitted_at: null,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'reviewer_employee_id,reviewee_employee_id,period',
+      });
+      if (error) throw error;
+      savedText.current[row.reviewee_id] = text;
+    }
+  };
+
+  useFormAutosave(!loading && givesComments, drafts, saveChangedDrafts);
 
   if (!reviewerEmployeeId) return null;
 

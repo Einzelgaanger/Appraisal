@@ -19,6 +19,7 @@ import {
   type GhcTaskRow,
 } from './ghcApi';
 import { useTenant } from '@/tenants/TenantContext';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 type Goal = { area: string; goal: string; indicator: string; timeline: string; reviewer: string };
 
@@ -69,18 +70,26 @@ export default function GhcQuarterlyEvaluationRunner({
   ]);
   const [partnerNotes, setPartnerNotes] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState(task.status === 'submitted' || task.status === 'acknowledged');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    setReady(false);
     setScores({});
     setComments({});
     setStrengths(['', '', '', '', '']);
     setImprovements(['', '', '', '', '']);
+    setPartnerNotes({});
     setRecordId(task.record_id);
     setLocked(task.status === 'submitted' || task.status === 'acknowledged');
-    if (!task.record_id) return;
-    void ghcGetQuarterlyEvaluation(task.record_id).then((row) => {
-      if (!row) return;
+    const load = async () => {
+      if (!task.record_id) return;
+      const row = await ghcGetQuarterlyEvaluation(task.record_id);
+      if (cancelled || !row) return;
       setLocked(row.status === 'submitted' || row.status === 'acknowledged');
       const nextScores: Record<string, number> = {};
       const nextComments: Record<string, string> = {};
@@ -95,14 +104,20 @@ export default function GhcQuarterlyEvaluationRunner({
       if (Array.isArray(row.improvement_goals) && row.improvement_goals.length) {
         setGoals(row.improvement_goals as Goal[]);
       }
-      void ghcGetPartnerRecommendations(row.id).then((rows) => {
-        const next: Record<string, string> = {};
-        for (const r of rows as Array<{ action_option: string; recommendation_by_manager?: string }>) {
-          next[r.action_option] = r.recommendation_by_manager ?? '';
-        }
-        setPartnerNotes(next);
-      });
+      const rows = await ghcGetPartnerRecommendations(row.id);
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const r of rows as Array<{ action_option: string; recommendation_by_manager?: string }>) {
+        next[r.action_option] = r.recommendation_by_manager ?? '';
+      }
+      setPartnerNotes(next);
+    };
+    void load().finally(() => {
+      if (!cancelled) setReady(true);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [open, task.record_id, task.status]);
 
   const computed = useMemo(() => {
@@ -119,7 +134,7 @@ export default function GhcQuarterlyEvaluationRunner({
     });
   }, [scores]);
 
-  const save = async (status: 'draft' | 'submitted') => {
+  const save = async (status: 'draft' | 'submitted', quiet = false) => {
     if (status === 'submitted') {
       for (const ind of GHC_EVAL_INDICATORS) {
         if (scores[ind.key] == null) {
@@ -128,7 +143,7 @@ export default function GhcQuarterlyEvaluationRunner({
         }
       }
     }
-    setBusy(true);
+    if (!quiet) setBusy(true);
     try {
       const payload: Record<string, unknown> = {
         id: recordId,
@@ -157,14 +172,21 @@ export default function GhcQuarterlyEvaluationRunner({
           });
         }
       }
-      toast.success(status === 'submitted' ? 'Evaluation submitted' : 'Draft saved');
+      if (!quiet) toast.success(status === 'submitted' ? 'Evaluation submitted' : 'Draft saved');
       if (status === 'submitted') onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save');
+      if (!quiet) toast.error(e instanceof Error ? e.message : 'Could not save');
+      else throw e;
     } finally {
-      setBusy(false);
+      if (!quiet) setBusy(false);
     }
   };
+
+  useFormAutosave(
+    open && ready && !locked,
+    { scores, comments, strengths, improvements, goals, partnerNotes },
+    () => save('draft', true),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

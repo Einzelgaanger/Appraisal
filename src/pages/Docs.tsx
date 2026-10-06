@@ -43,7 +43,9 @@ const SECTIONS: Section[] = [
           <li>
             <strong>Leave planner.</strong> Each leave type has its own balance. Annual leave is 10 working days a
             quarter, with a submission window and a blackout at the start and end of the quarter. One person per
-            department can be on leave at a time. Every request goes to HR first, then to the line manager.
+            department can be on leave at a time. A person cannot apply while their 360 feedback or quarterly
+            appraisal for the current quarter is still open. That rule is the same in every company. Every request
+            goes to HR first, then to the line manager.
           </li>
           <li>
             <strong>Profile.</strong> A person can update their name, role, department, and photo. Email and company
@@ -157,7 +159,7 @@ const SECTIONS: Section[] = [
             <tr><td>Rankings</td><td><code>tab=rankings</code></td><td>Off for all three live companies</td><td>Legacy wall of fame. The route redirects away when the capability is off.</td></tr>
             <tr><td>Group overview</td><td><code>tab=group</code></td><td>People with access to two or more companies</td><td>Appraisal progress across those companies, with a way to open each one.</td></tr>
             <tr><td>Projects</td><td><code>tab=projects</code></td><td>Everyone</td><td>Projects the person owns or has been invited to, inside the active company.</td></tr>
-            <tr><td>Leave planner</td><td><code>tab=leave</code></td><td>Everyone</td><td>Balance, request form, department calendar, and the approval queue for managers and HR.</td></tr>
+            <tr><td>Leave planner</td><td><code>tab=leave</code></td><td>Everyone</td><td>Balance, request form, department calendar, and the approval queue for managers and HR. Applying is closed while that person’s 360 or quarterly appraisal is still open.</td></tr>
             <tr><td>My profile</td><td><code>tab=profile</code></td><td>Everyone</td><td>Name, role, department, photo, and the company directory.</td></tr>
           </tbody>
         </table>
@@ -372,7 +374,20 @@ const SECTIONS: Section[] = [
         <ul>
           <li>Annual leave cannot fall in the first 14 days of the quarter, or in the last 14 days. If the quarter starts on date Q, allowed dates run from Q+14 through (quarter end − 14).</li>
           <li>Annual leave for the quarter must be submitted by the end of week 2, which is Q+13. After that date an employee cannot submit annual leave. Sick and the other types stay open.</li>
-          <li>HR can still place or reschedule after the annual deadline. HR chooses the person, or uses Move on an existing request. A new placement is cleared by HR and then waits for the line manager, unless HR is also that manager or there is no separate manager. The date, quarter, and department checks still run. The week-2 deadline is the only rule HR can pass, and only for annual leave.</li>
+          <li>HR can still place or reschedule after the annual deadline. HR chooses the person, or uses Move on an existing request. A new placement is cleared by HR and then waits for the line manager, unless HR is also that manager or there is no separate manager. The date, quarter, and department checks still run. The week-2 deadline is the only date rule HR can pass, and only for annual leave.</li>
+        </ul>
+        <h3>360 feedback and quarterly appraisal</h3>
+        <p>
+          An employee cannot apply for any leave type while they still owe 360 feedback or a quarterly appraisal
+          for the current quarter. The check lives in <code>workspace_appraisal_leave_block</code> and <code>workspace_request_leave</code>,
+          which rejects the request with the same reason the planner shows.
+          The rule is identical for Executive Team, GreenHouse Capital, and VigiPay. Each company uses its own forms.
+        </p>
+        <ul>
+          <li>Executive Team: every other active colleague’s peer 360, plus any Executive Office Quarterly Evaluation assigned to that person, plus the executive self-assessment where that person is on the allow-list.</li>
+          <li>GreenHouse Capital and VigiPay: every other active colleague’s peer 360, any quarterly evaluation that person owes as a line manager, and a quarterly evaluation that has been submitted and is waiting for their acknowledgement.</li>
+          <li>A draft does not count. Someone with no appraisal duties for that company is not blocked.</li>
+          <li>HR can still place or move leave for someone who is behind. The block applies when that person applies themselves.</li>
         </ul>
         <h3>Department rule</h3>
         <p>

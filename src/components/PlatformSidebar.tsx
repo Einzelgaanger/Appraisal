@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import CompanySwitcher from '@/components/CompanySwitcher';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 /** Dark sidebar chrome for tenants that ship their own palette, sampled from their logos. */
 const BRANDED_CHROME: Record<string, {
@@ -204,6 +205,8 @@ interface PlatformSidebarProps {
   items: SidebarItem[];
   onLogout?: () => void;
   actions?: React.ReactNode;
+  /** Saved profile photo. Shown beside the person's name in the sidebar. */
+  avatarUrl?: string | null;
   /**
    * When true, no mobile top bar is rendered (parent supplies mobile chrome, e.g. bottom tabs).
    * Desktop sidebar is unchanged.
@@ -218,6 +221,7 @@ export default function PlatformSidebar({
   items,
   onLogout,
   actions,
+  avatarUrl,
   suppressMobileHeader = false,
 }: PlatformSidebarProps) {
   const { tenant } = useTenant();
@@ -285,7 +289,7 @@ export default function PlatformSidebar({
               ) : null}
               <div className={brand.parentCredit ? 'mt-4' : undefined}>
                 <h2 className="font-display text-[17px] font-semibold leading-snug text-white">{title}</h2>
-                {subtitle && <p className="mt-1 text-[13px] text-white/70">{subtitle}</p>}
+                <SidebarPerson name={subtitle} avatarUrl={avatarUrl} branded />
               </div>
               {visibleMeta.length > 0 && (
                 <div className="mt-3 space-y-1.5">
@@ -304,7 +308,7 @@ export default function PlatformSidebar({
             <img src={brand.logo} alt={brand.logoAlt} className={brand.logoClassName} />
             <div className="mt-5">
               <h2 className="font-display text-[17px] font-semibold leading-snug text-foreground">{title}</h2>
-              {subtitle && <p className="mt-1 text-[13px] text-muted-foreground">{subtitle}</p>}
+              <SidebarPerson name={subtitle} avatarUrl={avatarUrl} />
             </div>
             {visibleMeta.length > 0 && (
               <div className="mt-3 space-y-1.5">
@@ -365,6 +369,51 @@ export default function PlatformSidebar({
         </header>
       )}
     </>
+  );
+}
+
+function personInitials(name: string) {
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+  return letters || 'ME';
+}
+
+function SidebarPerson({
+  name,
+  avatarUrl,
+  branded = false,
+}: {
+  name?: string | null;
+  avatarUrl?: string | null;
+  branded?: boolean;
+}) {
+  if (!name) return null;
+  if (!avatarUrl) {
+    return (
+      <p className={cn('mt-1 text-[13px]', branded ? 'text-white/70' : 'text-muted-foreground')}>{name}</p>
+    );
+  }
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <Avatar className={cn('h-12 w-12 shadow-sm', branded ? 'ring-2 ring-white/30' : 'ring-1 ring-black/10')}>
+        <AvatarImage src={avatarUrl} alt="" />
+        <AvatarFallback
+          className={cn(
+            'text-sm font-semibold',
+            branded ? 'bg-white/15 text-white' : 'bg-teal-100 text-teal-800',
+          )}
+        >
+          {personInitials(name)}
+        </AvatarFallback>
+      </Avatar>
+      <p className={cn('min-w-0 truncate text-[15px] font-semibold leading-snug', branded ? 'text-white' : 'text-foreground')}>
+        {name}
+      </p>
+    </div>
   );
 }
 

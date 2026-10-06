@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -105,12 +105,21 @@ export default function AssessmentRunner({
 }: AssessmentRunnerProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormRow | null>(null);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [responseStatus, setResponseStatus] = useState<string>('draft');
   const [draft, setDraft] = useState<Record<string, { score?: number; text?: string; no_opportunity?: boolean }>>({});
+  const dirtyRef = useRef(false);
+  const draftRef = useRef(draft);
+  const responseIdRef = useRef<string | null>(responseId);
+  const statusRef = useRef(responseStatus);
+  const saveErrorShown = useRef(false);
+  draftRef.current = draft;
+  responseIdRef.current = responseId;
+  statusRef.current = responseStatus;
   const [okrRows, setOkrRows] = useState<{ slot_index: number; objective_text: string; key_result_text: string | null }[]>(
     [],
   );
@@ -307,6 +316,45 @@ export default function AssessmentRunner({
     return out;
   }, [draft, formCode, responseId, visibleQuestions]);
 
+  const flushRef = useRef<() => Promise<void>>(async () => {});
+  flushRef.current = async () => {
+    const rid = responseIdRef.current;
+    if (!dirtyRef.current || !rid || statusRef.current !== 'draft') return;
+    const rows = buildAnswerRows();
+    if (!rows.length) return;
+    dirtyRef.current = false;
+    setAutoSaveState('saving');
+    try {
+      await persistAnswers(rows);
+      saveErrorShown.current = false;
+      setAutoSaveState('saved');
+    } catch (e: unknown) {
+      dirtyRef.current = true;
+      setAutoSaveState('error');
+      if (!saveErrorShown.current) {
+        saveErrorShown.current = true;
+        const message = e instanceof Error ? e.message : '';
+        toast.error(message || 'Could not save the draft');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!dirtyRef.current || !responseId || responseStatus !== 'draft') return;
+    const timer = window.setTimeout(() => { void flushRef.current(); }, 700);
+    return () => window.clearTimeout(timer);
+  }, [draft, responseId, responseStatus]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onLeave = () => { void flushRef.current(); };
+    window.addEventListener('pagehide', onLeave);
+    return () => {
+      window.removeEventListener('pagehide', onLeave);
+      void flushRef.current();
+    };
+  }, [open]);
+
   const handleSaveDraft = async () => {
     if (!responseId || responseStatus !== 'draft') {
       toast.error(responseStatus === 'submitted' ? 'This check-in is already submitted.' : 'The form is still opening. Wait a moment, then save again.');
@@ -315,6 +363,8 @@ export default function AssessmentRunner({
     setSaving(true);
     try {
       await persistAnswers(buildAnswerRows());
+      dirtyRef.current = false;
+      setAutoSaveState('saved');
       toast.success('Draft saved');
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : '');
@@ -363,6 +413,7 @@ export default function AssessmentRunner({
     setSubmitting(true);
     try {
       await persistAnswers(buildAnswerRows());
+      dirtyRef.current = false;
       const { error } = await supabase
         .from('assessment_responses')
         .update({ status: 'submitted', submitted_at: new Date().toISOString() })
@@ -382,6 +433,7 @@ export default function AssessmentRunner({
   };
 
   const setField = (qid: string, patch: Partial<{ score: number; text: string; no_opportunity: boolean }>) => {
+    dirtyRef.current = true;
     setDraft((prev) => ({
       ...prev,
       [qid]: { ...prev[qid], ...patch },
@@ -409,7 +461,13 @@ export default function AssessmentRunner({
   }, [draft, visibleQuestions]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) void flushRef.current();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent
         className={cn(
           'max-w-3xl max-h-[92vh] overflow-y-auto gap-0 p-0 sm:rounded-xl',
@@ -591,8 +649,19 @@ export default function AssessmentRunner({
               </div>
             ))}
 
-            <div className="flex flex-wrap gap-2 justify-end pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="flex flex-wrap items-center gap-2 justify-end pt-4 border-t border-border">
+              {!readOnly && (
+                <p className="mr-auto text-[12px] text-muted-foreground">
+                  {autoSaveState === 'saving' ? 'Saving draft…' : autoSaveState === 'error' ? 'Draft not saved yet' : 'Draft saves automatically'}
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void flushRef.current().finally(() => onOpenChange(false));
+                }}
+              >
                 Close
               </Button>
               {!readOnly && (

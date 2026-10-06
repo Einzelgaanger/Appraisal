@@ -19,6 +19,7 @@ import {
   epaQuestionNumFromSortOrder,
 } from '@/lib/epaAssessorAnchors';
 import BoomRatingScaleTable from './BoomRatingScaleTable';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 type QuestionRow = {
   id: string;
@@ -230,7 +231,7 @@ export default function ExecutiveAssessorRunner({
     if (error) throw error;
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (quiet = false) => {
     if (!assessorReviewId || readOnly) return;
     const rows = scoredQuestions
       .map((q) => {
@@ -245,19 +246,26 @@ export default function ExecutiveAssessorRunner({
       })
       .filter((x): x is { question_id: string; score: number; commentary: string | null } => x !== null);
     if (!rows.length) {
-      toast.message('No scores to save yet');
+      if (!quiet) toast.message('No scores to save yet');
       return;
     }
-    setSaving(true);
+    if (!quiet) setSaving(true);
     try {
       await persistRatings(rows);
-      toast.success('Saved');
+      if (!quiet) toast.success('Saved');
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Save failed');
+      if (!quiet) toast.error(e instanceof Error ? e.message : 'Save failed');
+      else throw e;
     } finally {
-      setSaving(false);
+      if (!quiet) setSaving(false);
     }
   };
+
+  useFormAutosave(
+    open && !loading && reviewStatus !== 'submitted',
+    { draftScores, draftCommentary },
+    () => handleSaveDraft(true),
+  );
 
   const validate = (): string | null => {
     for (const q of scoredQuestions) {

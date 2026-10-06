@@ -16,6 +16,7 @@ import {
   type GhcTaskRow,
 } from './ghcApi';
 import { useTenant } from '@/tenants/TenantContext';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 function YesNo({
   value,
@@ -87,15 +88,22 @@ export default function GhcMonthlySelfCheckinRunner({
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
   const [locked, setLocked] = useState(task.status === 'submitted');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    setReady(false);
     setForm(empty);
     setRecordId(task.record_id);
     setLocked(task.status === 'submitted');
-    if (!task.record_id) return;
-    void ghcGetMonthlySelfCheckin(task.record_id).then((row) => {
-      if (!row) return;
+    const load = async () => {
+      if (!task.record_id) return;
+      const row = await ghcGetMonthlySelfCheckin(task.record_id);
+      if (cancelled || !row) return;
       setLocked(row.status === 'submitted');
       setForm({
         time_off_this_quarter: row.time_off_this_quarter,
@@ -117,10 +125,16 @@ export default function GhcMonthlySelfCheckinRunner({
           ? row.question_comments as Record<string, string>
           : {},
       });
+    };
+    void load().finally(() => {
+      if (!cancelled) setReady(true);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [open, task.record_id, task.status]);
 
-  const save = async (status: 'draft' | 'submitted') => {
+  const save = async (status: 'draft' | 'submitted', quiet = false) => {
     if (status === 'submitted') {
       const requiredBool = [
         form.time_off_this_quarter,
@@ -135,7 +149,7 @@ export default function GhcMonthlySelfCheckinRunner({
         return;
       }
     }
-    setBusy(true);
+    if (!quiet) setBusy(true);
     try {
       const id = await ghcUpsertMonthlySelfCheckin({
         id: recordId,
@@ -145,18 +159,23 @@ export default function GhcMonthlySelfCheckinRunner({
         fulfilled: form.fulfilled || null,
       });
       setRecordId(id);
-      toast.success(
-        status === 'submitted'
-          ? 'Self check-in submitted — your manager and leadership can review it'
-          : 'Draft saved',
-      );
+      if (!quiet) {
+        toast.success(
+          status === 'submitted'
+            ? 'Self check-in submitted — your manager and leadership can review it'
+            : 'Draft saved',
+        );
+      }
       if (status === 'submitted') onSaved();
     } catch (e) {
-      toast.error(errorText(e, 'Could not save the check-in. Try again.'));
+      if (!quiet) toast.error(errorText(e, 'Could not save the check-in. Try again.'));
+      else throw e;
     } finally {
-      setBusy(false);
+      if (!quiet) setBusy(false);
     }
   };
+
+  useFormAutosave(open && ready && !locked, form, () => save('draft', true));
 
   const comment = (key: string) => form.question_comments[key] ?? '';
   const setComment = (key: string, value: string) => {

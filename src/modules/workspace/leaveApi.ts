@@ -57,6 +57,8 @@ export type LeaveBalance = {
   quarter_start: string;
   quarter_end: string;
   balances: Partial<Record<LeaveType, LeaveTypeBalance>>;
+  /** Set when 360 feedback or the quarterly appraisal for this quarter is still open. */
+  appraisal_block: string | null;
 };
 
 function rpcError(error: { message?: string } | null): never {
@@ -107,6 +109,9 @@ export async function myLeaveBalance(): Promise<LeaveBalance> {
     quarter_start: data?.quarter_start ?? '',
     quarter_end: data?.quarter_end ?? '',
     balances: readBalances(data?.balances),
+    appraisal_block: typeof data?.appraisal_block === 'string' && data.appraisal_block.trim()
+      ? data.appraisal_block
+      : null,
   };
 }
 

@@ -36,6 +36,19 @@ import { asStringList, extrasExcept, formatRoles, formatTeams } from '@/lib/pers
 import CoverageEditor from '@/components/org/CoverageEditor';
 import { cn } from '@/lib/utils';
 
+function thrownMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return fallback;
+}
+
+function profileRpcMissing(message: string): boolean {
+  return /could not find the function|schema cache|PGRST202/i.test(message);
+}
+
 const AVATAR_TONES = [
   'bg-rose-100 text-rose-700',
   'bg-violet-100 text-violet-700',
@@ -103,6 +116,8 @@ export default function MyProfilePanel({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const pendingAvatar = useRef<string | null>(null);
+  const seeded = useRef(false);
   const [teammates, setTeammates] = useState<WorkspaceColleague[]>([]);
   const [teammatesLoading, setTeammatesLoading] = useState(true);
 
@@ -110,13 +125,22 @@ export default function MyProfilePanel({
   const ghcStyle = isGhcStyleAppraisal(tenant);
 
   useEffect(() => {
-    setName(employeeName || profile?.name || '');
-    setRole(employeeRole || profile?.role || '');
-    setExtraRoles(extrasExcept(employeeRole || profile?.role, asStringList(employeeAdditionalRoles)));
-    setDepartment(employeeDepartment || profile?.department || '');
-    setExtraDepartments(extrasExcept(employeeDepartment || profile?.department, asStringList(employeeAdditionalDepartments)));
-    setAvatarUrl((profile as { avatar_url?: string | null } | null)?.avatar_url ?? null);
+    if (!profile || seeded.current) return;
+    seeded.current = true;
+    setName(employeeName || profile.name || '');
+    setRole(employeeRole || profile.role || '');
+    setExtraRoles(extrasExcept(employeeRole || profile.role, asStringList(employeeAdditionalRoles)));
+    setDepartment(employeeDepartment || profile.department || '');
+    setExtraDepartments(extrasExcept(employeeDepartment || profile.department, asStringList(employeeAdditionalDepartments)));
+    setAvatarUrl(profile.avatar_url ?? null);
   }, [employeeName, employeeRole, employeeAdditionalRoles, employeeDepartment, employeeAdditionalDepartments, profile]);
+
+  useEffect(() => {
+    const saved = profile?.avatar_url ?? null;
+    if (pendingAvatar.current && pendingAvatar.current !== saved) return;
+    pendingAvatar.current = null;
+    setAvatarUrl(saved);
+  }, [profile?.avatar_url]);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,14 +213,43 @@ export default function MyProfilePanel({
       if (error) throw error;
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       const url = `${data.publicUrl}?v=${Date.now()}`;
+      pendingAvatar.current = url;
       setAvatarUrl(url);
-      toast.success('Photo added. Save to keep it.');
+      await persistProfile(url);
+      toast.success('Photo saved');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not upload photo');
+      toast.error(thrownMessage(e, 'Could not upload photo'));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
+  };
+
+  const persistProfile = async (nextAvatar: string | null) => {
+    const cleanName = (name.trim() || employeeName || profile?.name || '').trim();
+    const cleanRole = (role.trim() || employeeRole || profile?.role || '').trim();
+    if (cleanName.length < 2 || cleanRole.length < 2) {
+      throw new Error('Name and role are required before this can be saved.');
+    }
+    const base = {
+      _name: cleanName,
+      _role: cleanRole,
+      _department: (department.trim() || employeeDepartment || profile?.department || '').trim() || null,
+      _avatar_url: nextAvatar,
+    };
+    const payload = {
+      ...base,
+      _additional_departments: extrasExcept(department, extraDepartments),
+      _additional_roles: extrasExcept(role, extraRoles),
+    };
+    let { error } = await db.rpc('update_my_profile', payload);
+    if (error && profileRpcMissing(error.message ?? '')) {
+      ({ error } = await db.rpc('update_my_profile', base));
+    }
+    if (error) throw new Error(error.message || 'Could not save profile');
+    await refreshProfile();
+    pendingAvatar.current = null;
+    onSaved?.();
   };
 
   const handleSave = async () => {
@@ -206,29 +259,10 @@ export default function MyProfilePanel({
     }
     setSaving(true);
     try {
-      const payload = {
-        _name: name.trim(),
-        _role: role.trim(),
-        _department: department.trim() || null,
-        _avatar_url: avatarUrl,
-        _additional_departments: extrasExcept(department, extraDepartments),
-        _additional_roles: extrasExcept(role, extraRoles),
-      };
-      let { error } = await db.rpc('update_my_profile', payload);
-      if (error && /additional_|schema cache|Could not find the function/i.test(error.message ?? '')) {
-        ({ error } = await db.rpc('update_my_profile', {
-          _name: payload._name,
-          _role: payload._role,
-          _department: payload._department,
-          _avatar_url: payload._avatar_url,
-        }));
-      }
-      if (error) throw error;
-      await refreshProfile();
-      onSaved?.();
+      await persistProfile(avatarUrl);
       toast.success('Profile saved');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save profile');
+      toast.error(thrownMessage(e, 'Could not save profile'));
     } finally {
       setSaving(false);
     }
@@ -245,10 +279,10 @@ export default function MyProfilePanel({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="group relative shrink-0"
+          className="group relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-full ring-4 ring-white lg:h-32 lg:w-32"
           aria-label="Change profile photo"
         >
-          <Avatar className="h-24 w-24 ring-4 ring-white lg:h-32 lg:w-32">
+          <Avatar className="h-full w-full">
             {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
             <AvatarFallback className={cn('text-2xl font-semibold lg:text-3xl', toneFor(name || 'me', AVATAR_TONES))}>
               {initials(name)}

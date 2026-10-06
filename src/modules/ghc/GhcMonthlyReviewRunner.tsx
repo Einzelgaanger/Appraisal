@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { GHC_CULTURE_VALUES } from './ghcConstants';
 import { ghcGetMonthlyReview, ghcUpsertMonthlyReview, type GhcTaskRow } from './ghcApi';
 import { useTenant } from '@/tenants/TenantContext';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 function YesNo({
   value,
@@ -84,15 +85,22 @@ export default function GhcMonthlyReviewRunner({
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
   const [locked, setLocked] = useState(task.status === 'submitted' || task.status === 'acknowledged');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    setReady(false);
     setForm(empty);
     setRecordId(task.record_id);
     setLocked(task.status === 'submitted' || task.status === 'acknowledged');
-    if (!task.record_id) return;
-    void ghcGetMonthlyReview(task.record_id).then((row) => {
-      if (!row) return;
+    const load = async () => {
+      if (!task.record_id) return;
+      const row = await ghcGetMonthlyReview(task.record_id);
+      if (cancelled || !row) return;
       setLocked(row.status === 'submitted' || row.status === 'acknowledged');
       setForm({
         proud_this_month: row.proud_this_month,
@@ -118,10 +126,16 @@ export default function GhcMonthlyReviewRunner({
         feedback_from_report: row.feedback_from_report ?? '',
         additional_comments: row.additional_comments ?? '',
       });
+    };
+    void load().finally(() => {
+      if (!cancelled) setReady(true);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [open, task.record_id]);
 
-  const save = async (status: 'draft' | 'submitted') => {
+  const save = async (status: 'draft' | 'submitted', quiet = false) => {
     if (status === 'submitted') {
       if (form.motivated === null || !form.motivated_why.trim()) {
         toast.error('Explain motivation with evidence.');
@@ -132,7 +146,7 @@ export default function GhcMonthlyReviewRunner({
         return;
       }
     }
-    setBusy(true);
+    if (!quiet) setBusy(true);
     try {
       const id = await ghcUpsertMonthlyReview({
         id: recordId,
@@ -144,14 +158,17 @@ export default function GhcMonthlyReviewRunner({
         fulfilled: form.fulfilled || null,
       });
       setRecordId(id);
-      toast.success(status === 'submitted' ? 'Monthly review submitted' : 'Draft saved');
+      if (!quiet) toast.success(status === 'submitted' ? 'Monthly review submitted' : 'Draft saved');
       if (status === 'submitted') onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save');
+      if (!quiet) toast.error(e instanceof Error ? e.message : 'Could not save');
+      else throw e;
     } finally {
-      setBusy(false);
+      if (!quiet) setBusy(false);
     }
   };
+
+  useFormAutosave(open && ready && !locked, form, () => save('draft', true));
 
   const cultureKeyMap: Record<string, keyof typeof form> = {
     founders_lps: 'culture_founders_lps',

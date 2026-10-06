@@ -79,6 +79,7 @@ interface Employee {
   subsidiary_id: string;
   email: string | null;
   hierarchy_level: number | null;
+  avatar_url?: string | null;
 }
 interface Category { id: string; name: string; sort_order: number; }
 interface Question { id: string; category_id: string; question_text: string; question_type: string; sort_order: number; }
@@ -1022,6 +1023,7 @@ export default function EmployeeHub() {
         suppressMobileHeader
         title={tenant.branding.workspaceLabel}
         subtitle={profile?.name}
+        avatarUrl={profile?.avatar_url || currentEmployee?.avatar_url}
         meta={[
           { label: ghcMode ? 'Company' : 'Subsidiary', value: currentEmployeeSubsidiary ?? 'Unlisted' },
           { label: ghcMode ? 'Team' : 'Department', value: formatTeams(currentEmployee?.department ?? profile?.department, currentEmployee?.additional_departments) },

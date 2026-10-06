@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { GHC_CULTURE_VALUES } from './ghcConstants';
 import { ghcGet360Response, ghcUpsert360, type GhcTaskRow } from './ghcApi';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 
 const empty = {
   score_founders_lps: 0,
@@ -42,15 +43,22 @@ export default function Ghc360Runner({
   const [busy, setBusy] = useState(false);
   const [recordId, setRecordId] = useState<string | null>(task.record_id);
   const [locked, setLocked] = useState(task.status === 'submitted');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    setReady(false);
     setForm(empty);
     setRecordId(task.record_id);
     setLocked(task.status === 'submitted');
-    if (!task.record_id) return;
-    void ghcGet360Response(task.record_id).then((row) => {
-      if (!row) return;
+    const load = async () => {
+      if (!task.record_id) return;
+      const row = await ghcGet360Response(task.record_id);
+      if (cancelled || !row) return;
       setLocked(row.status === 'submitted');
       setForm({
         score_founders_lps: row.score_founders_lps ?? 0,
@@ -66,13 +74,19 @@ export default function Ghc360Runner({
         did_well: row.did_well ?? '',
         additional_comments: row.additional_comments ?? '',
       });
+    };
+    void load().finally(() => {
+      if (!cancelled) setReady(true);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [open, task.record_id, task.status]);
 
   const scoreKey = (key: string) => `score_${key}` as keyof typeof empty;
   const exampleKey = (key: string) => `example_${key}` as keyof typeof empty;
 
-  const save = async (status: 'draft' | 'submitted') => {
+  const save = async (status: 'draft' | 'submitted', quiet = false) => {
     if (status === 'submitted') {
       for (const c of GHC_CULTURE_VALUES) {
         if (!form[scoreKey(c.key)]) {
@@ -89,7 +103,7 @@ export default function Ghc360Runner({
         return;
       }
     }
-    setBusy(true);
+    if (!quiet) setBusy(true);
     try {
       const id = await ghcUpsert360({
         id: recordId,
@@ -99,18 +113,23 @@ export default function Ghc360Runner({
         ...form,
       });
       setRecordId(id);
-      toast.success(
-        status === 'submitted'
-          ? '360 submitted — anonymous to peers; People Ops can see your name in Monitor'
-          : 'Draft saved',
-      );
+      if (!quiet) {
+        toast.success(
+          status === 'submitted'
+            ? '360 submitted — anonymous to peers; People Ops can see your name in Monitor'
+            : 'Draft saved',
+        );
+      }
       if (status === 'submitted') onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save');
+      if (!quiet) toast.error(e instanceof Error ? e.message : 'Could not save');
+      else throw e;
     } finally {
-      setBusy(false);
+      if (!quiet) setBusy(false);
     }
   };
+
+  useFormAutosave(open && ready && !locked, form, () => save('draft', true));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

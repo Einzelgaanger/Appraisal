@@ -407,6 +407,12 @@ export default function LeavePlanner({ employeeId }: Props) {
         ))}
       </div>
 
+      {balance?.appraisal_block && (
+        <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 ring-1 ring-amber-200">
+          {balance.appraisal_block} This is the same in every company. HR can still place leave.
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-teal-50 via-white to-amber-50 px-4 py-3 ring-1 ring-teal-100">
         <p className="text-sm text-foreground/80">
           <span className="font-display text-2xl font-semibold text-foreground">{formRemaining}</span>
@@ -595,6 +601,7 @@ export default function LeavePlanner({ employeeId }: Props) {
             Each leave type stands alone. Annual leave is 10 working days in the quarter and does not use up sick, compassionate, maternity, parental, study, unpaid, or other leave.
             Annual leave cannot fall in the first two weeks or the last two weeks of the quarter, and it has to be in before the end of week 2.
             Every request goes to HR first, by email and on this planner, and only then to your line manager.
+            You cannot apply while your 360 feedback or quarterly appraisal for this quarter is still open. That holds in every company.
           </p>
           <div className="mt-5 max-w-3xl space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -755,7 +762,8 @@ export default function LeavePlanner({ employeeId }: Props) {
                 (!editingId && !placingForOther && leaveType === 'annual' && !fullQuarter) ||
                 Boolean(dateConflict) ||
                 outsideWindow ||
-                (!editingId && !placingForOther && leaveType === 'annual' && !isHr && balance?.submit_open === false)
+                (!editingId && !placingForOther && leaveType === 'annual' && !isHr && balance?.submit_open === false) ||
+                (!editingId && !placingForOther && Boolean(balance?.appraisal_block))
               }
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
