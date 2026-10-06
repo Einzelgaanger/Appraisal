@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Loader2, User, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Briefcase,
+  Building2,
+  Camera,
+  CircleUserRound,
+  Loader2,
+  Mail,
+  Save,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeAuth } from '@/contexts/EmployeeAuthContext';
@@ -22,6 +32,31 @@ import {
 } from '@/lib/hierarchyConvention';
 import { isGhcStyleAppraisal, isGhcTenant } from '@/tenants/config';
 import { companyDirectory, type WorkspaceColleague } from '@/modules/workspace/workspaceApi';
+import { cn } from '@/lib/utils';
+
+const AVATAR_TONES = [
+  'bg-rose-100 text-rose-700',
+  'bg-violet-100 text-violet-700',
+  'bg-amber-100 text-amber-800',
+  'bg-sky-100 text-sky-700',
+  'bg-teal-100 text-teal-800',
+  'bg-orange-100 text-orange-700',
+];
+
+const DEPT_TONES = [
+  'bg-teal-100 text-teal-800',
+  'bg-violet-100 text-violet-800',
+  'bg-amber-100 text-amber-800',
+  'bg-sky-100 text-sky-800',
+  'bg-rose-100 text-rose-800',
+  'bg-orange-100 text-orange-800',
+];
+
+function toneFor(seed: string, tones: string[]) {
+  let n = 0;
+  for (let i = 0; i < seed.length; i += 1) n += seed.charCodeAt(i);
+  return tones[n % tones.length];
+}
 
 const db = supabase as any;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -174,38 +209,67 @@ export default function MyProfilePanel({
 
   const myId = profile?.employee_id ?? null;
 
-  return (
-    <div className="space-y-4">
-    <div className="surface-card p-5 sm:p-6 space-y-6 max-w-xl">
-      <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">◉ My profile</p>
-        <h2 className="font-display text-2xl font-medium mt-1">How you appear</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Update your name, role, and photo. Email and company stay as People Ops set them.
-        </p>
-      </div>
+  const fieldClass = 'h-11 rounded-2xl border-border/80 bg-white px-3.5 shadow-sm';
+  const lockedClass = 'disabled:opacity-100 disabled:bg-muted/50 disabled:text-foreground/80';
 
-      <div className="flex items-center gap-4">
+  return (
+    <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="flex flex-col gap-4 rounded-3xl bg-gradient-to-b from-rose-50 via-orange-50/70 to-amber-50/40 p-5 shadow-sm ring-1 ring-rose-100 sm:flex-row sm:items-center lg:sticky lg:top-6 lg:row-span-2 lg:block lg:p-6">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="relative group"
+          className="group relative shrink-0"
           aria-label="Change profile photo"
         >
-          <Avatar className="h-20 w-20 border border-border">
+          <Avatar className="h-24 w-24 ring-4 ring-white lg:h-32 lg:w-32">
             {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
-            <AvatarFallback className="text-lg">{initials(name)}</AvatarFallback>
+            <AvatarFallback className={cn('text-2xl font-semibold lg:text-3xl', toneFor(name || 'me', AVATAR_TONES))}>
+              {initials(name)}
+            </AvatarFallback>
           </Avatar>
-          <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-            {uploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-rose-950/45 opacity-0 transition-opacity group-hover:opacity-100">
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Camera className="h-5 w-5 text-white" />}
           </span>
         </button>
-        <div>
-          <p className="text-sm font-medium">Profile photo</p>
-          <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG or WebP · under 2 MB</p>
-          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? 'Uploading…' : 'Upload photo'}
-          </Button>
+        <div className="min-w-0 flex-1">
+        <h2 className="font-display text-[22px] font-semibold leading-tight text-foreground lg:mt-4">
+          {name.trim() || 'Your name'}
+        </h2>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {role.trim() ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-[12px] font-medium text-amber-800">
+              <Briefcase className="h-3.5 w-3.5" />
+              {role.trim()}
+            </span>
+          ) : null}
+          {department.trim() ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-1 text-[12px] font-medium text-teal-800">
+              <Users className="h-3.5 w-3.5" />
+              {department.trim()}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-4 space-y-2 text-[13px] text-foreground/75">
+          <p className="flex items-start gap-2">
+            <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" />
+            <span className="break-all">{profile?.email || 'No email yet'}</span>
+          </p>
+          <p className="flex items-start gap-2">
+            <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
+            <span>{companyName || 'No company yet'}</span>
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-5 h-9 rounded-full border-rose-200 bg-white px-4 font-sans text-[13px] font-medium normal-case tracking-normal text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? 'Uploading…' : 'Upload photo'}
+        </Button>
+        <p className="mt-2 text-[12px] text-muted-foreground">JPG, PNG, or WebP, under 2 MB</p>
         </div>
         <input
           ref={fileRef}
@@ -214,123 +278,169 @@ export default function MyProfilePanel({
           className="hidden"
           onChange={(e) => void handlePhoto(e.target.files?.[0])}
         />
-      </div>
+      </aside>
 
-      <div className="grid gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="profile-name">Name</Label>
-          <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+      <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm sm:p-6 lg:col-start-2">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-[22px] font-semibold leading-tight text-foreground">How you appear</h2>
+            <p className="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
+              The card on the left updates as you type. Email and company stay as People Ops set them.
+            </p>
+          </div>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={saving || uploading}
+            className="h-11 gap-2 rounded-2xl bg-rose-500 px-5 font-sans text-sm font-medium normal-case tracking-normal text-white hover:bg-rose-600"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save profile
+          </Button>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="profile-role">Role</Label>
-          {ghc ? (
-            <Select value={role || undefined} onValueChange={setRole}>
-              <SelectTrigger id="profile-role">
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roleOptions.map((option) => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input id="profile-role" value={role} onChange={(e) => setRole(e.target.value)} />
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="profile-dept">Department</Label>
-          {departmentOptions.length > 0 ? (
-            <Select value={department || undefined} onValueChange={setDepartment}>
-              <SelectTrigger id="profile-dept">
-                <SelectValue placeholder="Select team" />
-              </SelectTrigger>
-              <SelectContent>
-                {departmentOptions.map((option) => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input id="profile-dept" value={department} onChange={(e) => setDepartment(e.target.value)} />
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="profile-email">Email</Label>
-          <Input id="profile-email" value={profile?.email ?? ''} disabled readOnly />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="profile-company">Company</Label>
-          <Input id="profile-company" value={companyName ?? ''} disabled readOnly />
-        </div>
-      </div>
 
-      <Button onClick={() => void handleSave()} disabled={saving || uploading} className="gap-2">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <User className="h-4 w-4" />}
-        Save profile
-      </Button>
-    </div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <ProfileField id="profile-name" label="Name" icon={CircleUserRound} chip="rounded-lg bg-violet-100 text-violet-700">
+            <Input id="profile-name" className={fieldClass} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          </ProfileField>
+          <ProfileField id="profile-role" label="Role" icon={Briefcase} chip="rounded-md bg-amber-100 text-amber-800">
+            {ghc ? (
+              <Select value={role || undefined} onValueChange={setRole}>
+                <SelectTrigger id="profile-role" className={fieldClass}>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input id="profile-role" className={fieldClass} value={role} onChange={(e) => setRole(e.target.value)} />
+            )}
+          </ProfileField>
+          <ProfileField id="profile-dept" label="Department" icon={Users} chip="rounded-full bg-teal-100 text-teal-800">
+            {departmentOptions.length > 0 ? (
+              <Select value={department || undefined} onValueChange={setDepartment}>
+                <SelectTrigger id="profile-dept" className={fieldClass}>
+                  <SelectValue placeholder="Select team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input id="profile-dept" className={fieldClass} value={department} onChange={(e) => setDepartment(e.target.value)} />
+            )}
+          </ProfileField>
+          <ProfileField id="profile-company" label="Company" hint="Set by People Ops" icon={Building2} chip="rounded-[10px] bg-indigo-100 text-indigo-700">
+            <Input id="profile-company" className={cn(fieldClass, lockedClass)} value={companyName ?? ''} disabled readOnly />
+          </ProfileField>
+          <ProfileField id="profile-email" label="Email" hint="Set by People Ops" icon={Mail} chip="rounded-xl bg-sky-100 text-sky-700" className="sm:col-span-2">
+            <Input id="profile-email" className={cn(fieldClass, lockedClass)} value={profile?.email ?? ''} disabled readOnly />
+          </ProfileField>
+        </div>
+      </section>
 
-    <div className="surface-card p-5 sm:p-6 space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Users className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">◉ Teammates</p>
-          <h2 className="font-display text-xl font-medium mt-1">
-            {companyName ? `People at ${companyName}` : 'Your company'}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {teammates.length} {teammates.length === 1 ? 'person' : 'people'} in this company, grouped by department.
-          </p>
-        </div>
-      </div>
-
-      {teammatesLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading teammates…
-        </div>
-      ) : teammates.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No teammates found for this company yet.</p>
-      ) : (
-        <div className="space-y-5">
-          {teammatesByDept.map(([dept, people]) => (
-            <div key={dept}>
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                {dept} · {people.length}
+      <section className="space-y-5 rounded-3xl border border-black/5 bg-white p-5 shadow-sm sm:p-6 lg:col-start-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+              <Users className="h-5 w-5" strokeWidth={2.25} />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-semibold text-foreground">
+                {companyName ? `People at ${companyName}` : 'Your company'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {teammates.length} {teammates.length === 1 ? 'person' : 'people'}, grouped by department.
               </p>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {people.map((person) => {
-                  const mine = person.id === myId;
-                  return (
-                    <li
-                      key={person.id}
-                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
-                        mine ? 'border-primary/30 bg-primary/5' : 'border-border/60'
-                      }`}
-                    >
-                      <Avatar className="h-9 w-9 border border-border">
-                        {person.avatar_url ? <AvatarImage src={person.avatar_url} alt={person.name} /> : null}
-                        <AvatarFallback className="text-xs">{initials(person.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {person.name}
-                          {mine ? <span className="text-muted-foreground font-normal"> · you</span> : null}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{person.role || 'No role set'}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
             </div>
-          ))}
+          </div>
         </div>
-      )}
+
+        {teammatesLoading ? (
+          <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading teammates…
+          </div>
+        ) : teammates.length === 0 ? (
+          <p className="py-2 text-sm text-muted-foreground">No teammates found for this company yet.</p>
+        ) : (
+          <div className="space-y-5">
+            {teammatesByDept.map(([dept, people]) => (
+              <div key={dept}>
+                <p className={cn('mb-2 inline-flex items-center rounded-full px-2.5 py-1 text-[12.5px] font-medium', toneFor(dept, DEPT_TONES))}>
+                  {dept}
+                  <span className="ml-1.5 opacity-70">{people.length}</span>
+                </p>
+                <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {people.map((person) => {
+                    const mine = person.id === myId;
+                    return (
+                      <li
+                        key={person.id}
+                        className={cn(
+                          'flex items-center gap-3 rounded-2xl px-3 py-2.5',
+                          mine ? 'bg-rose-50 ring-1 ring-rose-200' : 'bg-muted/40',
+                        )}
+                      >
+                        <Avatar className="h-9 w-9">
+                          {person.avatar_url ? <AvatarImage src={person.avatar_url} alt={person.name} /> : null}
+                          <AvatarFallback className={cn('text-xs font-semibold', toneFor(person.name, AVATAR_TONES))}>
+                            {initials(person.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {person.name}
+                            {mine ? <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[11px] font-medium text-rose-700">You</span> : null}
+                          </p>
+                          <p className="truncate text-[13px] text-muted-foreground">{person.role || 'No role set'}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
+  );
+}
+
+function ProfileField({
+  id,
+  label,
+  hint,
+  icon: Icon,
+  chip,
+  className,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  icon: LucideIcon;
+  chip: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('space-y-2', className)}>
+      <div className="flex items-center gap-2.5">
+        <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center', chip)}>
+          <Icon className="h-4 w-4" strokeWidth={2.25} />
+        </span>
+        <div>
+          <Label htmlFor={id} className="text-[14px] font-medium tracking-normal">{label}</Label>
+          {hint ? <p className="text-[12px] text-muted-foreground">{hint}</p> : null}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }

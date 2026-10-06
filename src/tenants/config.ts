@@ -43,7 +43,7 @@ export const TENANTS: TenantConfig[] = [
     branding: {
       shortName: 'Executive Team',
       fullName: 'VGG Executive Team',
-      workspaceLabel: 'Executive Team BOOM workspace',
+      workspaceLabel: 'Executive Team BOOM',
     },
     capabilities: { ...boomCapabilities },
   },
@@ -57,7 +57,7 @@ export const TENANTS: TenantConfig[] = [
     branding: {
       shortName: 'GHC',
       fullName: 'GreenHouse Capital',
-      workspaceLabel: 'GreenHouse Capital workspace',
+      workspaceLabel: 'GreenHouse Capital',
     },
     capabilities: {
       showDemoRoute: false,
@@ -86,7 +86,7 @@ export const TENANTS: TenantConfig[] = [
     branding: {
       shortName: 'VigiPay',
       fullName: 'VigiPay',
-      workspaceLabel: 'VigiPay appraisal workspace',
+      workspaceLabel: 'VigiPay appraisal',
     },
     capabilities: {
       showDemoRoute: false,

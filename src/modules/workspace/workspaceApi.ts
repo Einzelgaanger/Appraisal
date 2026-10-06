@@ -48,6 +48,11 @@ export type WorkspaceProjectListItem = {
   my_status: ProjectMembershipStatus;
   owner_id: string | null;
   owner_name: string | null;
+  priority: PlannerPriority;
+  status: PlannerStatus;
+  weight: number;
+  key_result_id: string | null;
+  key_result_title: string | null;
   progress_pct: number;
   task_count: number;
   done_count: number;
@@ -94,6 +99,8 @@ export type WorkspaceTask = {
   waiting_on: string | null;
   last_movement: string | null;
   blocked_on_task_id: string | null;
+  shared?: boolean;
+  weight?: number;
   wait_days: number;
   pending_delegation: {
     id: string;
@@ -118,6 +125,9 @@ export type WorkspaceProjectDetail = {
     name: string;
     description: string | null;
     due_date: string | null;
+    priority: PlannerPriority;
+    status: PlannerStatus;
+    weight: number;
     created_at: string;
     created_by: string;
     progress_pct: number;
@@ -175,6 +185,8 @@ export async function createProject(payload: {
   name: string;
   description?: string;
   dueDate?: string | null;
+  priority?: PlannerPriority;
+  status?: PlannerStatus;
 }): Promise<string> {
   const { data, error } = await db.rpc('workspace_create_project', {
     _name: payload.name,
@@ -182,7 +194,24 @@ export async function createProject(payload: {
     _due_date: payload.dueDate || null,
   });
   if (error) rpcError(error);
-  return data as string;
+  const id = data as string;
+  if (payload.priority || payload.status) {
+    await setProjectPlan(id, payload.priority ?? 'medium', payload.status ?? 'not_started');
+  }
+  return id;
+}
+
+export async function setProjectPlan(
+  projectId: string,
+  priority: PlannerPriority,
+  status: PlannerStatus,
+): Promise<void> {
+  const { error } = await db.rpc('workspace_set_project_plan', {
+    _project_id: projectId,
+    _priority: priority,
+    _status: status,
+  });
+  if (error) rpcError(error);
 }
 
 export async function inviteMember(projectId: string, employeeId: string): Promise<void> {
@@ -269,8 +298,10 @@ export type PlannerObjective = {
   status: PlannerStatus;
   due_date: string | null;
   locked: boolean;
+  weight: number;
   progress_pct: number;
   child_count: number;
+  child_titles: string[];
 };
 
 export type PlannerKeyResult = {
@@ -284,6 +315,7 @@ export type PlannerKeyResult = {
   priority: PlannerPriority;
   status: PlannerStatus;
   due_date: string | null;
+  weight: number;
   progress_pct: number;
   project_count: number;
   task_count: number;
@@ -295,7 +327,7 @@ export type PlannerTaskRow = {
   title: string;
   project_id: string;
   project_name: string;
-  also_on: string[];
+  also_on: { id: string; name: string }[];
   key_result_title: string | null;
   assignee_name: string;
   due_date: string | null;
@@ -309,10 +341,11 @@ export type PlannerBoard = {
   can_manage_objectives: boolean;
   is_leadership: boolean;
   objectives_locked: boolean;
+  lock_on: string | null;
   company_objectives: PlannerObjective[];
   unit_objectives: PlannerObjective[];
   key_results: PlannerKeyResult[];
-  project_links: { id: string; key_result_id: string | null }[];
+  project_links: { id: string; key_result_id: string | null; priority?: PlannerPriority; status?: PlannerStatus; weight?: number }[];
   tasks: PlannerTaskRow[];
 };
 
@@ -325,16 +358,70 @@ export async function getPlanner(): Promise<PlannerBoard> {
     can_manage_objectives: Boolean(row.can_manage_objectives),
     is_leadership: Boolean(row.is_leadership),
     objectives_locked: Boolean(row.objectives_locked),
-    company_objectives: row.company_objectives ?? [],
-    unit_objectives: row.unit_objectives ?? [],
+    lock_on: row.lock_on ?? null,
+    company_objectives: (row.company_objectives ?? []).map((item) => ({ ...item, child_titles: item.child_titles ?? [] })),
+    unit_objectives: (row.unit_objectives ?? []).map((item) => ({ ...item, child_titles: item.child_titles ?? [] })),
     key_results: row.key_results ?? [],
     project_links: row.project_links ?? [],
-    tasks: (row.tasks ?? []).map((task) => ({ ...task, also_on: task.also_on ?? [] })),
+    tasks: (row.tasks ?? []).map((task) => ({
+      ...task,
+      also_on: Array.isArray(task.also_on) ? task.also_on : [],
+    })),
   };
+}
+
+export type PlannerWeightItem = {
+  id: string;
+  level: 'objective' | 'key_result' | 'project' | 'task';
+  title: string;
+  priority: string;
+  status: string;
+  due_date: string | null;
+  weight?: number;
+};
+
+function ruleWeight(item: PlannerWeightItem) {
+  const base = item.priority === 'critical' ? 4 : item.priority === 'high' ? 3 : item.priority === 'low' ? 1 : 2;
+  let weight = base;
+  if (item.status === 'blocked') weight += 1;
+  if (item.due_date && item.status !== 'done' && item.status !== 'cancelled') {
+    const due = new Date(`${item.due_date}T12:00:00`);
+    const days = (due.getTime() - Date.now()) / 86400000;
+    if (days <= 7) weight += 1;
+  }
+  return Math.max(1, Math.min(6, weight));
+}
+
+export async function suggestPlannerWeights(items: PlannerWeightItem[]): Promise<{ items: PlannerWeightItem[]; source: 'model' | 'rules' }> {
+  const rules = items.map((item) => ({ ...item, weight: ruleWeight(item) }));
+  try {
+    const { data, error } = await supabase.functions.invoke('planner-weights', { body: { items } });
+    const suggested = Array.isArray(data?.items) ? data.items as PlannerWeightItem[] : [];
+    if (!error && suggested.length > 0) {
+      return { items: suggested, source: data?.source === 'rules' ? 'rules' : 'model' };
+    }
+  } catch {
+    // The rule weights still apply when the model is unavailable.
+  }
+  return { items: rules, source: 'rules' };
+}
+
+export async function applyPlannerWeights(items: { id: string; level: string; weight: number }[]): Promise<number> {
+  const { data, error } = await db.rpc('workspace_apply_weights', { _items: items });
+  if (error) rpcError(error);
+  return Number(data ?? 0);
 }
 
 export async function linkTaskToProject(taskId: string, projectId: string): Promise<void> {
   const { error } = await db.rpc('workspace_link_task_project', {
+    _task_id: taskId,
+    _project_id: projectId,
+  });
+  if (error) rpcError(error);
+}
+
+export async function unlinkTaskFromProject(taskId: string, projectId: string): Promise<void> {
+  const { error } = await db.rpc('workspace_unlink_task_project', {
     _task_id: taskId,
     _project_id: projectId,
   });

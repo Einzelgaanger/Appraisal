@@ -37,6 +37,8 @@ enable_confirmations = false
     verify_jwt = false
   [functions.chat]
     verify_jwt = false
+  [functions.planner-weights]
+    verify_jwt = true
   [functions.process-email-queue]
     verify_jwt = true
   [functions.adaptive-resources]

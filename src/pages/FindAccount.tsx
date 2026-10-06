@@ -24,17 +24,17 @@ interface EmployeeResult {
   subsidiaries: { name: string } | null;
 }
 
-const normalizeSearchText = (value: string) =>
-  value
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+interface AccountCandidate {
+  id: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  department: string | null;
+  company_name: string | null;
+}
 
-const compactSearchText = (value: string) => value.replace(/[^a-z0-9]/g, '');
-const EMPLOYEE_FETCH_BATCH = 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_ACCOUNT_QUERY = 3;
 
 /** Who we are about to email. `name` is absent when the address was typed in directly. */
 interface PendingReset {
@@ -57,63 +57,38 @@ export default function FindAccount() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [employeeIndex, setEmployeeIndex] = useState<EmployeeResult[] | null>(null);
   const { resetPassword } = useEmployeeAuth();
   const navigate = useNavigate();
 
-  const fetchEmployeeIndex = useCallback(async () => {
-    if (employeeIndex) return employeeIndex;
+  const searchAccounts = useCallback(async (query: string) => {
+    const { data, error: err } = await supabase.rpc('find_account_candidates', { _query: query });
+    if (err) throw err;
+    return ((data ?? []) as AccountCandidate[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      email: row.email,
+      department: row.department,
+      subsidiaries: row.company_name ? { name: row.company_name } : null,
+    }));
+  }, []);
 
-    let from = 0;
-    const records: EmployeeResult[] = [];
-
-    while (true) {
-      const to = from + EMPLOYEE_FETCH_BATCH - 1;
-      const { data, error: err } = await supabase
-        .from('employees')
-        .select('id, name, role, email, department, subsidiaries(name)')
-        .order('name')
-        .range(from, to);
-
-      if (err) throw err;
-
-      const batch = (data as unknown as EmployeeResult[]) || [];
-      records.push(...batch);
-
-      if (batch.length < EMPLOYEE_FETCH_BATCH) break;
-      from += EMPLOYEE_FETCH_BATCH;
-    }
-
-    setEmployeeIndex(records);
-    return records;
-  }, [employeeIndex]);
-
-  // Debounced live search over full employee index
+  // Search on the server. A short or empty query returns nobody.
   useEffect(() => {
     const query = searchQuery.trim();
 
     const timeout = setTimeout(async () => {
+      if (query.length < MIN_ACCOUNT_QUERY) {
+        setResults([]);
+        setHasSearched(false);
+        setSearching(false);
+        return;
+      }
+
       setSearching(true);
       setError('');
       try {
-        const employees = await fetchEmployeeIndex();
-        const normalizedQuery = normalizeSearchText(query);
-        const compactQuery = compactSearchText(normalizedQuery);
-        const tokens = normalizedQuery.split(' ').filter(Boolean);
-
-        const filtered = !normalizedQuery
-          ? employees
-          : employees.filter((employee) => {
-              const searchable = normalizeSearchText(`${employee.name} ${employee.email ?? ''}`);
-              const compactSearchable = compactSearchText(searchable);
-
-              const tokenMatch = tokens.length > 0 && tokens.every((token) => searchable.includes(token));
-              const compactMatch = compactQuery.length > 0 && compactSearchable.includes(compactQuery);
-
-              return tokenMatch || compactMatch;
-            });
-
-        setResults(filtered);
+        setResults(await searchAccounts(query));
         setHasSearched(true);
       } catch {
         setError('Search failed. Please try again.');
@@ -123,7 +98,7 @@ export default function FindAccount() {
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [searchQuery, fetchEmployeeIndex]);
+  }, [searchQuery, searchAccounts]);
 
   const [pendingReset, setPendingReset] = useState<PendingReset | null>(null);
   const query = searchQuery.trim();
@@ -292,8 +267,8 @@ export default function FindAccount() {
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
               )}
             </div>
-            {query.length === 0 ? (
-              <p className="mt-2 text-[11px] text-muted-foreground">Showing all accounts. Type to narrow the list.</p>
+            {query.length < MIN_ACCOUNT_QUERY ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">Type at least 3 letters of your name or work email.</p>
             ) : (
               <p className="mt-2 text-[11px] text-muted-foreground">Tap your profile and we'll email you a link to set your password.</p>
             )}

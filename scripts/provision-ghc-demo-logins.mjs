@@ -22,6 +22,12 @@ function loadEnv() {
 
 const DEMO_PASSWORD = 'GhcDemo2026!';
 const env = loadEnv();
+const hosted = /supabase\.co/i.test(env.VITE_SUPABASE_URL || '');
+if (hosted) {
+  console.error('Refusing to stamp the shared Greenhouse Capital password on the hosted project.');
+  console.error('People on that password are asked to choose their own the next time they sign in.');
+  process.exit(1);
+}
 const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });

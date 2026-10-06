@@ -767,6 +767,7 @@ export type Database = {
           employee_id: string | null
           hierarchy_level: number | null
           id: string
+          must_change_password: boolean
           name: string
           profile_completed: boolean
           profile_completed_at: string | null
@@ -781,6 +782,7 @@ export type Database = {
           employee_id?: string | null
           hierarchy_level?: number | null
           id: string
+          must_change_password?: boolean
           name: string
           profile_completed?: boolean
           profile_completed_at?: string | null
@@ -795,6 +797,7 @@ export type Database = {
           employee_id?: string | null
           hierarchy_level?: number | null
           id?: string
+          must_change_password?: boolean
           name?: string
           profile_completed?: boolean
           profile_completed_at?: string | null
@@ -1139,6 +1142,17 @@ export type Database = {
       tenant_slug_for_email: {
         Args: { _email: string }
         Returns: string
+      }
+      find_account_candidates: {
+        Args: { _query: string }
+        Returns: {
+          company_name: string | null
+          department: string | null
+          email: string | null
+          id: string
+          name: string
+          role: string | null
+        }[]
       }
       move_to_dlq: {
         Args: {

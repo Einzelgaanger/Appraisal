@@ -25,6 +25,7 @@ import { TenantProvider, useTenant } from "@/tenants/TenantContext";
 import TenantSubsidiaryBridge from "@/tenants/TenantSubsidiaryBridge";
 import TenantLockEnforcer from "@/tenants/TenantLockEnforcer";
 import LocalDevBanner from "@/components/LocalDevBanner";
+import PasswordChangeGate from "@/components/PasswordChangeGate";
 import { isApexHostname, isTenantSubdomainHost } from "@/tenants/config";
 import { companyWorkspaceUrl } from "@/tenants/companyHome";
 
@@ -123,6 +124,7 @@ function AppRoutes() {
   const showDemoRoute = tenant.capabilities.showDemoRoute;
 
   return (
+    <PasswordChangeGate>
     <Routes>
       <Route path="/omotola" element={<Navigate to="/hub?tab=survey" replace />} />
       <Route path="/docs" element={<Docs />} />
@@ -154,6 +156,7 @@ function AppRoutes() {
       <Route path="/demo" element={showDemoRoute ? <DemoDashboard /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </PasswordChangeGate>
   );
 }
 
@@ -174,8 +177,12 @@ const App = () => (
               <TenantSubsidiaryBridge>
                 <TenantLockEnforcer>
                 <AuthProvider>
-                  <LocalDevBanner />
-                  <AppRoutes />
+                  <div className="app-shell">
+                    <LocalDevBanner />
+                    <div className="app-shell-scroll">
+                      <AppRoutes />
+                    </div>
+                  </div>
                 </AuthProvider>
                 </TenantLockEnforcer>
               </TenantSubsidiaryBridge>

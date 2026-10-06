@@ -272,8 +272,40 @@
 @layer components {
   /* ---------- Editorial page chrome ---------- */
   .app-page {
-    @apply min-h-screen;
+    @apply min-h-full;
     background-color: hsl(var(--background));
+  }
+
+  .app-shell {
+    display: flex;
+    height: 100dvh;
+    max-height: 100dvh;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-shell-scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+
+  .app-sticky-subnav {
+    position: sticky;
+    top: calc(3.5rem + env(safe-area-inset-top, 0px));
+    z-index: 30;
+  }
+
+  .app-fixed-sidebar {
+    top: var(--app-banner-h, 0px);
+    height: calc(100dvh - var(--app-banner-h, 0px));
   }
 
   .app-page-grid { display: none; }
@@ -634,6 +666,16 @@
       width: 0;
       height: 0;
     }
+  }
+
+  .sidebar-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .scrollbar-thin {

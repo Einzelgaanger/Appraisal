@@ -8,6 +8,7 @@ import {
   Clock3,
   FolderKanban,
   ListTodo,
+  Rocket,
   Loader2,
   Plus,
   ScrollText,
@@ -43,6 +44,7 @@ import {
   companyDirectory,
   createProject,
   createTask,
+  setProjectPlan,
   delegateTask,
   getProject,
   inviteMember,
@@ -53,6 +55,8 @@ import {
   respondInvite,
   setTaskProgress,
   updateTask,
+  type PlannerPriority,
+  type PlannerStatus,
   type TaskCruciality,
   type TaskFlowState,
   type WorkspaceColleague,
@@ -94,8 +98,10 @@ function accessLabel(reason: string | undefined) {
   return null;
 }
 
+const softButton = 'h-10 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal';
+
 function FieldLabel({ children }: { children: ReactNode }) {
-  return <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{children}</p>;
+  return <p className="text-sm font-medium text-foreground/80">{children}</p>;
 }
 
 function CompletionRing({ value, size = 84 }: { value: number; size?: number }) {
@@ -129,7 +135,7 @@ function CompletionRing({ value, size = 84 }: { value: number; size?: number }) 
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="display-number text-[15px] leading-none text-foreground">{pct}<span className="text-[10px]">%</span></span>
-        <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Done</span>
+        <span className="mt-0.5 text-[11px] font-medium text-muted-foreground">Done</span>
       </div>
     </div>
   );
@@ -147,19 +153,21 @@ function FigureBoard({
   waiting: number;
 }) {
   const tiles = [
-    { label: 'Done', value: done, icon: CheckCircle2, tone: 'bg-success/10 text-success ring-success/20' },
-    { label: 'Open', value: remaining, icon: ListTodo, tone: 'bg-primary/10 text-primary ring-primary/20' },
+    { label: 'Done', value: done, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-900', chip: 'rounded-full bg-emerald-100 text-emerald-800' },
+    { label: 'Open', value: remaining, icon: ListTodo, tone: 'bg-teal-50 text-teal-900', chip: 'rounded-2xl bg-teal-100 text-teal-800' },
     {
       label: 'Crucial',
       value: crucial,
       icon: AlertTriangle,
-      tone: crucial > 0 ? 'bg-destructive/10 text-destructive ring-destructive/25' : 'bg-muted/70 text-muted-foreground ring-border',
+      tone: crucial > 0 ? 'bg-rose-50 text-rose-900' : 'bg-muted/50 text-muted-foreground',
+      chip: crucial > 0 ? 'rounded-xl bg-rose-100 text-rose-800' : 'rounded-xl bg-white text-muted-foreground',
     },
     {
       label: 'Waiting',
       value: waiting,
       icon: Clock3,
-      tone: waiting > 0 ? 'bg-warning/15 text-warning-foreground ring-warning/30' : 'bg-muted/70 text-muted-foreground ring-border',
+      tone: waiting > 0 ? 'bg-amber-50 text-amber-950' : 'bg-muted/50 text-muted-foreground',
+      chip: waiting > 0 ? 'rounded-full bg-amber-100 text-amber-900' : 'rounded-full bg-white text-muted-foreground',
     },
   ];
   return (
@@ -167,13 +175,13 @@ function FigureBoard({
       {tiles.map((tile) => {
         const Icon = tile.icon;
         return (
-          <div key={tile.label} className={cn('flex items-center gap-2.5 rounded-md px-3 py-2.5 ring-1 ring-inset', tile.tone)}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card/80">
+          <div key={tile.label} className={cn('flex items-center gap-2.5 rounded-2xl px-3 py-3', tile.tone)}>
+            <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center', tile.chip)}>
               <Icon className="h-4 w-4" strokeWidth={2.25} />
             </span>
             <span className="min-w-0">
-              <span className="display-number block text-lg leading-none">{tile.value}</span>
-              <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{tile.label}</span>
+              <span className="font-display block text-xl font-semibold leading-none">{tile.value}</span>
+              <span className="mt-1 block text-[13px] font-medium">{tile.label}</span>
             </span>
           </div>
         );
@@ -199,7 +207,7 @@ function CrucialLine({
     )}>
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em]">{meta}</span>
+      <span className="shrink-0 text-[12px] font-medium">{meta}</span>
     </li>
   );
 }
@@ -237,6 +245,8 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newDue, setNewDue] = useState('');
+  const [newPriority, setNewPriority] = useState<PlannerPriority>('medium');
+  const [newStatus, setNewStatus] = useState<PlannerStatus>('not_started');
   const [saving, setSaving] = useState(false);
 
   const loadList = useCallback(async () => {
@@ -305,11 +315,15 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
         name: newName.trim(),
         description: newDescription.trim() || undefined,
         dueDate: newDue || null,
+        priority: newPriority,
+        status: newStatus,
       });
       setCreateOpen(false);
       setNewName('');
       setNewDescription('');
       setNewDue('');
+      setNewPriority('medium');
+      setNewStatus('not_started');
       await loadList();
       onOpenProject(id);
       toast.success('Project created');
@@ -323,8 +337,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
   if (!employeeId) {
     return (
       <div className="surface-card">
-        <p className="eyebrow-primary">Projects</p>
-        <h2 className="font-display mt-3 text-2xl font-medium tracking-tight">Company register</h2>
+        <h2 className="font-display text-2xl font-semibold">Company register</h2>
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">Finish your profile so this workspace can be placed in the right company.</p>
       </div>
     );
@@ -347,24 +360,30 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="max-w-2xl">
-          <p className="eyebrow-primary">Planner</p>
-          <h2 className="font-display mt-3 text-[1.75rem] font-medium tracking-tight">Company objectives to tasks</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Work is entered by hand. Completion rolls upward. Members, their line manager, and company leadership can open a project.
-          </p>
+    <div className="space-y-6">
+      <div className="app-sticky-subnav -mx-4 bg-background/95 px-4 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-sky-50 via-white to-amber-50 p-5 ring-1 ring-sky-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+            <Rocket className="h-5 w-5" />
+          </span>
+          <div className="max-w-2xl">
+            <h2 className="font-display text-[1.65rem] font-semibold">Company objectives to tasks</h2>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Work is entered by hand. Completion rolls upward. Members, their line manager, and company leadership can open a project.
+            </p>
+          </div>
         </div>
-        <Button className="shrink-0 gap-2" onClick={() => setCreateOpen(true)}>
+        <Button className={cn(softButton, 'shrink-0 gap-2 bg-teal-500 text-white hover:bg-teal-600')} onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" /> New project
         </Button>
+      </div>
       </div>
 
       {pendingInvites.length > 0 && (
         <section className="surface-card !p-0">
           <div className="border-b border-border px-5 py-3">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Invitations</p>
+            <p className="text-sm font-medium">Invitations</p>
           </div>
           <div className="divide-y divide-border">
             {pendingInvites.map((project) => (
@@ -380,7 +399,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
         </section>
       )}
 
-      <PlannerLadder projects={myProjects} directory={directory} onOpenProject={onOpenProject} />
+      <PlannerLadder projects={myProjects} directory={directory} onOpenProject={onOpenProject} onChanged={loadList} />
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -395,7 +414,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 xl:grid-cols-2">
           {myProjects.map((project) => {
             const access = accessLabel(project.view_reason);
             const crucial = project.crucial_remaining ?? [];
@@ -411,15 +430,15 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
                     onOpenProject(project.id);
                   }
                 }}
-                className="surface-card cursor-pointer space-y-4 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                className="cursor-pointer space-y-4 rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-black/5 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
               >
                 <div className="flex items-center gap-4">
                   <CompletionRing value={project.progress_pct ?? 0} />
                   <div className="min-w-0 flex-1">
                     {access && (
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{access}</p>
+                      <p className="text-[12px] font-medium text-teal-700">{access}</p>
                     )}
-                    <h3 className={cn('font-display truncate text-xl font-medium tracking-tight', access && 'mt-1')}>{project.name}</h3>
+                    <h3 className={cn('font-display truncate text-xl font-semibold', access && 'mt-1')}>{project.name}</h3>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       <span>{project.owner_name ?? 'Owner'}</span>
                       <span className="text-border">·</span>
@@ -463,7 +482,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New project</DialogTitle>
-            <DialogDescription>Invitations stay inside this company. Completion is the share of tasks finished.</DialogDescription>
+            <DialogDescription>Invitations stay inside this company. Completion uses each task’s weight, and priority is the starting weight.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -474,14 +493,40 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
               <FieldLabel>Purpose</FieldLabel>
               <Textarea placeholder="Optional" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <FieldLabel>Priority</FieldLabel>
+                <Select value={newPriority} onValueChange={(value) => setNewPriority(value as PlannerPriority)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>Status</FieldLabel>
+                <Select value={newStatus} onValueChange={(value) => setNewStatus(value as PlannerStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not started</SelectItem>
+                    <SelectItem value="in_progress">In progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="blocked">Blocked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-1.5">
               <FieldLabel>Due date</FieldLabel>
               <Input type="date" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button disabled={saving || !newName.trim()} onClick={() => void handleCreate()}>
+            <Button variant="outline" className={softButton} onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button className={cn(softButton, 'bg-teal-500 text-white hover:bg-teal-600')} disabled={saving || !newName.trim()} onClick={() => void handleCreate()}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
             </Button>
           </DialogFooter>
@@ -622,22 +667,54 @@ function ProjectDetail({
 
   return (
     <div className="space-y-8">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="h-3.5 w-3.5" /> Register
+      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Back to projects
       </button>
 
       <section className="surface-card space-y-5">
         <div className="flex flex-wrap items-center gap-5">
           <CompletionRing value={detail.project.progress_pct ?? 0} size={108} />
           <div className="min-w-0 flex-1">
-            <p className="eyebrow-primary">{access ?? 'Project'}</p>
-            <h2 className="font-display mt-2 text-[1.75rem] font-medium tracking-tight">{detail.project.name}</h2>
+            {access ? <p className="text-[12px] font-medium text-teal-700">{access}</p> : null}
+            <h2 className="font-display mt-1 text-[1.75rem] font-semibold">{detail.project.name}</h2>
             {detail.project.description && (
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{detail.project.description}</p>
             )}
             <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Calendar className="h-3.5 w-3.5" /> {dueLabel(detail.project.due_date)}
             </p>
+            {canEdit ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Select
+                  value={detail.project.priority || 'medium'}
+                  onValueChange={(priority) => void setProjectPlan(detail.project.id, priority as PlannerPriority, (detail.project.status || 'not_started') as PlannerStatus).then(onReload).catch((error) => toast.error(error instanceof Error ? error.message : 'Could not update priority'))}
+                >
+                  <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={detail.project.status || 'not_started'}
+                  onValueChange={(status) => void setProjectPlan(detail.project.id, (detail.project.priority || 'medium') as PlannerPriority, status as PlannerStatus).then(onReload).catch((error) => toast.error(error instanceof Error ? error.message : 'Could not update status'))}
+                >
+                  <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not started</SelectItem>
+                    <SelectItem value="in_progress">In progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="blocked">Blocked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {(detail.project.priority || 'medium')} · {(detail.project.status || 'not_started').replace(/_/g, ' ')}
+              </p>
+            )}
             {viewReason === 'line_manager' && (
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Visible because someone on this project reports to you. The record is read only.</p>
             )}
@@ -688,7 +765,7 @@ function ProjectDetail({
           {pendingForMe.length > 0 && (
             <section className="surface-card !p-0">
               <div className="border-b border-border px-5 py-3">
-                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Delegated to you</p>
+                <p className="text-sm font-medium text-foreground/80">Delegated to you</p>
               </div>
               {pendingForMe.map((task) => (
                 <div key={task.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-4 last:border-0">
@@ -736,7 +813,7 @@ function ProjectDetail({
             <section className="space-y-4">
               <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Work</p>
+                  <p className="text-sm font-medium text-foreground/80">Work</p>
                   <h3 className="font-display mt-1 text-lg font-medium tracking-tight">Tasks</h3>
                 </div>
                 {canEdit && (
@@ -765,7 +842,7 @@ function ProjectDetail({
             <aside className="space-y-4">
               <section className="surface-card !p-0">
                 <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                  <h3 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  <h3 className="flex items-center gap-1.5 text-sm font-medium text-foreground/80">
                     <Users className="h-3.5 w-3.5" /> People
                   </h3>
                   {canEdit && (
@@ -782,7 +859,7 @@ function ProjectDetail({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">{member.name}</span>
-                        <span className="block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        <span className="block text-[12px] text-muted-foreground">
                           {member.status === 'invited' ? 'Invited' : member.role}
                         </span>
                       </span>
@@ -794,7 +871,7 @@ function ProjectDetail({
               <section className="surface-card !p-0">
                 <div className="flex items-center gap-1.5 border-b border-border px-5 py-3">
                   <ScrollText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Activity</h3>
+                  <h3 className="text-sm font-medium text-foreground/80">Activity</h3>
                 </div>
                 {detail.activity.length === 0 ? (
                   <p className="px-5 py-4 text-xs text-muted-foreground">Nothing recorded yet.</p>
@@ -810,7 +887,7 @@ function ProjectDetail({
                         {typeof entry.detail?.progress === 'number' && (
                           <span className="text-muted-foreground"> ({entry.detail.progress}%)</span>
                         )}
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        <div className="mt-1 text-[12px] text-muted-foreground">
                           {formatWhen(entry.created_at)}
                         </div>
                       </li>
@@ -975,6 +1052,7 @@ function TaskCard({
             <p className="text-sm font-medium tracking-tight">{task.title}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {task.assignee_name} · {dueLabel(task.due_date)}
+              {task.shared ? ' · also on this project' : ''}
               {task.pending_delegation ? ` · offered to ${task.pending_delegation.to_name}` : ''}
               {(task.wait_days ?? 0) > 0 ? ` · ${task.wait_days} working days` : ''}
             </p>
@@ -982,14 +1060,14 @@ function TaskCard({
           <div className="flex shrink-0 items-center gap-1.5">
             {(critical || high) && (
               <span className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium normal-case tracking-normal',
                 critical ? 'bg-destructive/10 text-destructive' : 'bg-warning/20 text-warning-foreground',
               )}>
                 <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
                 {CRUCIAL_LABELS[task.cruciality ?? 'medium']}
               </span>
             )}
-            <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="rounded-full bg-muted px-2 py-1 text-[12px] font-medium normal-case tracking-normal text-muted-foreground">
               {FLOW_LABELS[task.flow_state ?? 'ready']}
             </span>
           </div>
@@ -999,19 +1077,19 @@ function TaskCard({
           <dl className="mt-3 grid gap-y-1.5 text-xs">
             {task.waiting_on && (
               <div className="grid grid-cols-[7.25rem_minmax(0,1fr)] gap-3">
-                <dt className="uppercase tracking-[0.12em] text-muted-foreground">Waiting on</dt>
+                <dt className="text-muted-foreground">Waiting on</dt>
                 <dd className="text-foreground">{task.waiting_on}</dd>
               </div>
             )}
             {blockedTitle && (
               <div className="grid grid-cols-[7.25rem_minmax(0,1fr)] gap-3">
-                <dt className="uppercase tracking-[0.12em] text-muted-foreground">Depends on</dt>
+                <dt className="text-muted-foreground">Depends on</dt>
                 <dd className="text-foreground">{blockedTitle}</dd>
               </div>
             )}
             {task.last_movement && (
               <div className="grid grid-cols-[7.25rem_minmax(0,1fr)] gap-3">
-                <dt className="uppercase tracking-[0.12em] text-muted-foreground">Last movement</dt>
+                <dt className="text-muted-foreground">Last movement</dt>
                 <dd className="text-foreground">{task.last_movement}</dd>
               </div>
             )}

@@ -11,8 +11,9 @@ import heroTeam from '@/assets/hero-team-mobile.jpg';
 import { useTenant } from '@/tenants/TenantContext';
 import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import { isGhcStyleAppraisal } from '@/tenants/config';
+import { isSharedDemoPassword, SHARED_PASSWORD_MESSAGE } from '@/lib/sharedPasswords';
 
-/** Drop the consumed recovery token from the address bar, keeping tenant routing intact. */
+/** Drop the consumed recovery token from the address bar, including an older fragment token. */
 function stripTokensFromUrl() {
   const url = new URL(window.location.href);
   for (const key of ['token_hash', 'token', 'code', 'type']) url.searchParams.delete(key);
@@ -65,6 +66,20 @@ export default function ResetPassword() {
       // the flow does not depend on one Supabase project setting.
       const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
       const code = url.searchParams.get('code');
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+
+      // Links issued before the code flow still carry the session in the fragment.
+      // Accept them once, then remove them from the address bar.
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        stripTokensFromUrl();
+        settle(sessionError ? 'invalid' : 'ready', sessionError?.message ?? '');
+        return;
+      }
 
       if (tokenHash) {
         const { error: verifyError } = await supabase.auth.verifyOtp({
@@ -89,6 +104,7 @@ export default function ResetPassword() {
       while (!cancelled) {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
+          stripTokensFromUrl();
           settle('ready');
           return;
         }
@@ -115,6 +131,10 @@ export default function ResetPassword() {
     }
     if (password !== confirm) {
       setError('Passwords do not match.');
+      return;
+    }
+    if (isSharedDemoPassword(password)) {
+      setError(SHARED_PASSWORD_MESSAGE);
       return;
     }
 

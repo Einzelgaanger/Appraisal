@@ -5,6 +5,10 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // `npm run dev` and `npm run dev:local` both write node_modules/.vite.
+  // A shared cache leaves one server stuck on deps_temp and answering 504
+  // "Outdated Optimize Dep", which blanks the page.
+  cacheDir: path.resolve(__dirname, `node_modules/.vite-${mode}`),
   server: {
     host: "::",
     port: 8080,

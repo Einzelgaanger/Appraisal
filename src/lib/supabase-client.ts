@@ -37,6 +37,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
     persistSession: true,
     autoRefreshToken: true,
     storageKey: localStack ? 'sb-local-docker-auth' : undefined,
+    // Recovery emails come back with a one-time code. Session tokens stay in
+    // storage and are not written into the address bar.
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });
 

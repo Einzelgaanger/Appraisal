@@ -13,6 +13,7 @@ interface Profile {
   department: string | null;
   subsidiary_id: string | null;
   hierarchy_level: number | null;
+  must_change_password: boolean | null;
   avatar_url: string | null;
   profile_completed: boolean | null;
   profile_completed_at: string | null;

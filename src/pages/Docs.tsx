@@ -370,7 +370,7 @@ const SECTIONS: Section[] = [
         <ul>
           <li>No leave in the first 14 days of the quarter, and none in the last 14 days. If the quarter starts on date Q, allowed dates run from Q+14 through (quarter end − 14).</li>
           <li>Requests for the quarter must be submitted by the end of week 2, which is Q+13. After that date the request form is closed for employees.</li>
-          <li>HR can still place or reschedule remaining days after the deadline. The assert function takes a bypass flag that only <code>workspace_is_hr()</code> turns on. HR uses that to move leftover days around department conflicts.</li>
+          <li>HR can still place or reschedule remaining days after the deadline. In the leave form, HR chooses the person, or uses Move on an existing request. That writes the block as approved. The date, quarter, and department checks still run. The week-2 deadline is the only rule HR can pass.</li>
         </ul>
         <h3>Department rule</h3>
         <p>

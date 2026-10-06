@@ -1043,18 +1043,17 @@ export default function EmployeeHub() {
           <>
             {ghcMode ? <GhcNotificationsBell /> : <BoomNotificationsBell />}
             {isPlatformAdmin && (
-              <Button variant="outline" size="sm" asChild className="w-full gap-2 border-primary/30 text-primary">
+              <Button variant="outline" size="sm" asChild className="h-10 w-full gap-2 rounded-2xl border-primary/30 font-sans text-[13px] font-medium normal-case tracking-normal text-primary">
                 <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin console</Link>
               </Button>
             )}
             {ghcMode && isCompanyAdmin && !isPlatformAdmin && (
-              <Button variant="outline" size="sm" asChild className="w-full gap-2 border-primary/30 text-primary">
+              <Button variant="outline" size="sm" asChild className="h-10 w-full gap-2 rounded-2xl border-primary/30 font-sans text-[13px] font-medium normal-case tracking-normal text-primary">
                 <Link to={`/hub?tab=survey&tenant=${tenant.slug}&ghcTab=admin&ghcQuarter=${hubQuarter}`}>
-                  <Shield className="w-4 h-4" /> HR Monitor
+                  <Shield className="w-4 h-4" /> HR monitor
                 </Link>
               </Button>
             )}
-            {showGroupOverview && <CompanySwitcher branded={false} />}
             <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-muted-foreground px-1">
               <Shield className="w-3.5 h-3.5" />
               <span>Anonymous</span>
@@ -1063,43 +1062,42 @@ export default function EmployeeHub() {
         }
       />
 
-      {/* Mobile top bar — logo + active section label, no hamburger */}
+      {/* Tabs */}
+      <div className="lg:pl-72">
       <header
-        className="lg:hidden sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80"
+        className="app-sticky-header border-b border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="px-4 h-14 flex items-center justify-between min-h-[3.5rem]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 rounded-md object-contain" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground truncate">
-              ◉ {activeTab === 'survey' ? 'Appraiser'
-                  : activeTab === 'dashboard' ? 'My Dashboard'
-                  : activeTab === 'growth' && showGrowthHub ? 'Growth Hub'
+        <div className="flex h-14 min-h-[3.5rem] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <img src={brand.logoMark} alt={brand.logoAlt} className="h-9 w-auto flex-shrink-0 rounded-md object-contain lg:hidden" />
+            <span className="truncate font-display text-[15px] font-semibold text-foreground">
+              {activeTab === 'survey' ? 'Appraiser'
+                  : activeTab === 'dashboard' ? 'My dashboard'
+                  : activeTab === 'growth' && showGrowthHub ? 'Growth hub'
                   : activeTab === 'rankings' ? 'Rankings'
-                  : activeTab === 'projects' ? 'Projects'
+                  : activeTab === 'projects' ? 'Planner'
                   : activeTab === 'leave' ? 'Leave planner'
                   : activeTab === 'profile' ? 'My profile'
+                  : activeTab === 'group' ? 'Group overview'
                   : 'Appraisal'}
             </span>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             {ghcMode ? <GhcNotificationsBell compact /> : <BoomNotificationsBell compact />}
             {showGroupOverview && (
-              <div className="max-w-[140px] scale-90 origin-right">
+              <div className="max-w-[140px] origin-right scale-90 lg:hidden">
                 <CompanySwitcher />
               </div>
             )}
             {isPlatformAdmin && (
-              <Link to="/appraisal" aria-label="Admin" className="text-muted-foreground hover:text-primary p-2">
-                <Shield className="w-4 h-4" />
+              <Link to="/appraisal" aria-label="Admin" className="p-2 text-muted-foreground hover:text-primary lg:hidden">
+                <Shield className="h-4 w-4" />
               </Link>
             )}
           </div>
         </div>
       </header>
-
-      {/* Tabs */}
-      <div className="lg:pl-72">
       <div className="platform-content section-stack px-4 sm:px-6 lg:px-8 has-mobile-tabbar">
         <Tabs value={activeTab} onValueChange={setTab}>
           {/* ============ SURVEY TAB ============ */}
@@ -1689,7 +1687,7 @@ export default function EmployeeHub() {
 
           {/* ============ PROFILE TAB ============ */}
           <TabsContent value="profile" className="mt-4">
-            <div className="space-y-4 max-w-3xl">
+            <div className="space-y-4">
               <MyProfilePanel
                 companyName={currentEmployeeSubsidiary ?? null}
                 employeeRole={currentEmployee?.role ?? profile?.role ?? null}
@@ -1697,24 +1695,26 @@ export default function EmployeeHub() {
                 employeeName={currentEmployee?.name ?? profile?.name ?? null}
                 onSaved={() => void loadData()}
               />
+              <div className="flex flex-wrap gap-2">
               {showGroupOverview && (
-                <Button variant="outline" asChild className="w-full gap-2">
+                <Button variant="outline" asChild className="h-10 gap-2 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal">
                   <Link to="/hub?tab=group"><Building2 className="w-4 h-4" /> Group overview</Link>
                 </Button>
               )}
               {isPlatformAdmin && (
-                <Button variant="outline" asChild className="w-full gap-2 border-primary/30 text-primary">
-                  <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin Console</Link>
+                <Button variant="outline" asChild className="h-10 gap-2 rounded-2xl border-primary/30 font-sans text-sm font-medium normal-case tracking-normal text-primary">
+                  <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin console</Link>
                 </Button>
               )}
               {ghcMode && isCompanyAdmin && !isPlatformAdmin && (
-                <Button variant="outline" asChild className="w-full gap-2 border-primary/30 text-primary">
+                <Button variant="outline" asChild className="h-10 gap-2 rounded-2xl border-primary/30 font-sans text-sm font-medium normal-case tracking-normal text-primary">
                   <Link to={`/hub?tab=survey&tenant=${tenant.slug}&ghcTab=admin&ghcQuarter=${hubQuarter}`}>
-                    <Shield className="w-4 h-4" /> HR Monitor
+                    <Shield className="w-4 h-4" /> HR monitor
                   </Link>
                 </Button>
               )}
-              <Button variant="outline" onClick={handleLogout} className="w-full lg:hidden">Sign Out</Button>
+              <Button variant="outline" onClick={handleLogout} className="h-10 rounded-2xl font-sans text-sm font-medium normal-case tracking-normal lg:hidden">Sign out</Button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

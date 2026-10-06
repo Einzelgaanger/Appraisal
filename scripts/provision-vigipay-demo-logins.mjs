@@ -13,6 +13,12 @@ import { loadDotEnv } from './load-env.mjs';
 loadDotEnv();
 
 const PASSWORD = 'VigiPayDemo2026!';
+const hosted = /supabase\.co/i.test(process.env.VITE_SUPABASE_URL || '');
+if (hosted && !process.argv.includes('--revoke')) {
+  console.error('Refusing to stamp the shared VigiPay password on the hosted project.');
+  console.error('People on that password are asked to choose their own the next time they sign in.');
+  process.exit(1);
+}
 const TARGETS = ['Oluseyi Oluwabusola', 'Lawal Abdulateef', 'Marcia Cole'];
 const revoke = process.argv.includes('--revoke');
 

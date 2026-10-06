@@ -74,6 +74,26 @@ export async function myLeaveBalance(): Promise<LeaveBalance> {
   };
 }
 
+export async function placeLeave(payload: {
+  employeeId: string;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  note?: string;
+  requestId?: string | null;
+}): Promise<string> {
+  const { data, error } = await db.rpc('workspace_place_leave', {
+    _employee_id: payload.employeeId,
+    _leave_type: payload.leaveType,
+    _start_date: payload.startDate,
+    _end_date: payload.endDate,
+    _note: payload.note ?? null,
+    _request_id: payload.requestId ?? null,
+  });
+  if (error) rpcError(error);
+  return data as string;
+}
+
 export async function requestLeave(payload: {
   leaveType: LeaveType;
   startDate: string;

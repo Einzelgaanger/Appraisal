@@ -50,6 +50,12 @@ loadDotEnv();
 
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const hosted = /supabase\.co/i.test(url || '');
+if (hosted && !process.argv.includes('--allow-production')) {
+  console.error('Refusing to stamp the shared demo password on a hosted project.');
+  console.error('Shared passwords stay on the local Docker database. Point .env at 127.0.0.1 first.');
+  process.exit(1);
+}
 const defaultPassword = process.env.DEMO_DEFAULT_PASSWORD || 'BoomEoDemo2026!';
 const adminEmail = (process.env.DEMO_ADMIN_EMAIL || 'bunmi.akinyemiju@peopleos.co').trim().toLowerCase();
 
