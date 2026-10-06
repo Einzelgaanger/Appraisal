@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { ChevronRight, Loader2, Network } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { displayHierarchyLabel } from '@/lib/hierarchyConvention';
@@ -165,11 +166,12 @@ export default function CompanyOrgChart({ viewerId }: { viewerId?: string | null
   const { tenant } = useTenant();
   const [people, setPeople] = useState<OrgPerson[]>([]);
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      startLoading();
       try {
         let rows: Record<string, unknown>[] = [];
         if (isGhcStyleAppraisal(tenant)) {
@@ -198,13 +200,13 @@ export default function CompanyOrgChart({ viewerId }: { viewerId?: string | null
       } catch {
         if (!cancelled) setPeople([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) finishLoading();
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [tenant.appraisalMode, tenant.slug, tenant.subsidiaryId]);
+  }, [finishLoading, startLoading, tenant.appraisalMode, tenant.slug, tenant.subsidiaryId]);
 
   if (loading) {
     return (

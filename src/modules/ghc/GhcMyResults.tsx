@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,7 @@ export default function GhcMyResults({
   const deepEvalId = searchParams.get('ghcEval');
 
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [meId, setMeId] = useState<string | null>(null);
   const [agg, setAgg] = useState<{
     released: boolean;
@@ -106,7 +108,7 @@ export default function GhcMyResults({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      startLoading();
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: me } = await (supabase as any).rpc('ghc_me');
@@ -140,11 +142,11 @@ export default function GhcMyResults({
           setAccessible([]);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) finishLoading();
       }
     })();
     return () => { cancelled = true; };
-  }, [periodQuarter, periodMonth, acknowledgeTask?.record_id, deepEvalId]);
+  }, [acknowledgeTask?.record_id, deepEvalId, finishLoading, periodMonth, periodQuarter, startLoading]);
 
   useEffect(() => {
     const id = acknowledgeTask?.record_id || activeEvalId;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -174,9 +174,11 @@ export default function BoomReviewHub({
     revieweeName: string;
   } | null>(null);
 
+  const assignmentsKey = useRef<string | null>(null);
   const loadAssignments = useCallback(async () => {
     if (!reviewerEmployeeId) return;
-    setLoading(true);
+    const key = `${reviewerEmployeeId}:${periodQuarter}:${periodMonth}`;
+    if (assignmentsKey.current !== key) setLoading(true);
     try {
       const { data, error } = await supabase.rpc('get_review_assignments', {
         _period_quarter: periodQuarter,
@@ -188,6 +190,7 @@ export default function BoomReviewHub({
         return;
       }
       setRows((data ?? []) as AssignmentRow[]);
+      assignmentsKey.current = key;
     } finally {
       setLoading(false);
     }

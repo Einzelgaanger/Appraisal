@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -33,10 +34,11 @@ export default function GhcFeedbackDiscussion({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    startLoading();
     try {
       const data = await ghcGetFeedbackDiscussion(kind, subjectId, period, facilitatorId ?? null);
       setDiscussionId((data?.discussion_id as string) ?? null);
@@ -45,9 +47,9 @@ export default function GhcFeedbackDiscussion({
       toast.error(e instanceof Error ? e.message : 'Could not load discussion');
       setMessages([]);
     } finally {
-      setLoading(false);
+      finishLoading();
     }
-  }, [kind, subjectId, period, facilitatorId]);
+  }, [facilitatorId, finishLoading, kind, period, startLoading, subjectId]);
 
   useEffect(() => {
     void load();

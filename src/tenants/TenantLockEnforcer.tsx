@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useEmployeeAuth } from '@/contexts/EmployeeAuthContext';
 import { useTenant } from '@/tenants/TenantContext';
 import {
@@ -18,6 +18,7 @@ export default function TenantLockEnforcer({ children }: { children: ReactNode }
   const { lockedTenantSlug, profile, isLoading } = useEmployeeAuth();
   const { setLockedTenantSlug, setSubsidiaryHint } = useTenant();
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLockedTenantSlug(lockedTenantSlug);
@@ -55,13 +56,11 @@ export default function TenantLockEnforcer({ children }: { children: ReactNode }
     }
 
     if (queryTenant !== lockedTenantSlug) {
-      const next = new URL(window.location.href);
-      next.searchParams.set('tenant', lockedTenantSlug);
-      if (next.toString() !== window.location.href) {
-        window.location.replace(next.toString());
-      }
+      const next = new URLSearchParams(location.search);
+      next.set('tenant', lockedTenantSlug);
+      navigate({ pathname: location.pathname, search: next.toString() }, { replace: true });
     }
-  }, [isLoading, lockedTenantSlug, location.pathname, location.search]);
+  }, [isLoading, lockedTenantSlug, location.pathname, location.search, navigate]);
 
   return <>{children}</>;
 }

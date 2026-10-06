@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -106,6 +107,7 @@ export default function BoomDirectoryPanel({
   periodMonth = defaultMonthPeriod(),
 }: BoomDirectoryPanelProps) {
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [rows, setRows] = useState<RosterRow[]>([]);
   const [eaRoster, setEaRoster] = useState<EaQuarterlyStatusRow[]>([]);
   const [selected, setSelected] = useState<RosterRow | null>(null);
@@ -119,10 +121,10 @@ export default function BoomDirectoryPanel({
     if (!canView) {
       setRows([]);
       setEaRoster([]);
-      setLoading(false);
+      finishLoading();
       return;
     }
-    setLoading(true);
+    startLoading();
     const [rosterRes, eaStatus] = await Promise.all([
       supabase.rpc('get_eo_directory_roster'),
       fetchEaQuarterlyStatusRoster(periodQuarter),
@@ -169,8 +171,8 @@ export default function BoomDirectoryPanel({
     } else {
       setRows([]);
     }
-    setLoading(false);
-  }, [canView, isAdmin, viewerEmployeeId, viewerHierarchyLevel, periodQuarter]);
+    finishLoading();
+  }, [canView, finishLoading, isAdmin, startLoading, viewerEmployeeId, viewerHierarchyLevel, periodQuarter]);
 
   useEffect(() => {
     void load();

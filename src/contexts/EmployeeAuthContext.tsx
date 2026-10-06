@@ -134,18 +134,22 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // A token refresh creates a new user object for the same person. Replacing
+    // state with it reloads the profile and the route guards swap the whole
+    // app for the startup skeleton.
+    const applySession = (session: Session | null) => {
       setSession(session);
-      setUser(session?.user ?? null);
-      setProfileLoading(!!session);
+      const next = session?.user ?? null;
+      setUser((current) => (current?.id === next?.id ? (current ?? next) : next));
       setAuthReady(true);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setProfileLoading(!!session);
-      setAuthReady(true);
+      applySession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -234,11 +238,10 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user?.id]);
 
   const refreshProfile = async (preferOpenedHost = true) => {
     if (!user) return;
-    setProfileLoading(true);
     const [{ data: profileData }, { data: roleData }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle(),
@@ -257,7 +260,6 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     const platformAdmin = !!roleData;
     setIsPlatformAdmin(platformAdmin);
     setIsAdmin(platformAdmin || companyAdmin);
-    setProfileLoading(false);
   };
 
   const switchCompany = async (employeeId: string) => {
@@ -273,8 +275,8 @@ export function EmployeeAuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data.session) {
       setSession(data.session);
-      setUser(data.session.user);
-      setProfileLoading(true);
+      const signedIn = data.session.user;
+      setUser((current) => (current?.id === signedIn.id ? (current ?? signedIn) : signedIn));
       setAuthReady(true);
     }
     return { error: error?.message ?? null };

@@ -170,6 +170,8 @@ export default function EmployeeHub() {
   const [directionScores, setDirectionScores] = useState<DirectionScores>({ above: [], peer: [], below: [] });
   const [directionCounts, setDirectionCounts] = useState<{ above: number; peer: number; below: number }>({ above: 0, peer: 0, below: 0 });
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const dashboardKey = useRef<string | null>(null);
+  const rankingsLoaded = useRef(false);
   const [qualitativeFeedback, setQualitativeFeedback] = useState<{ startDoing: FeedbackItem[]; stopDoing: FeedbackItem[]; continueDoing: FeedbackItem[] }>({ startDoing: [], stopDoing: [], continueDoing: [] });
   const [aiDataContext, setAiDataContext] = useState('');
   const [cohortScores, setCohortScores] = useState<CohortScore[]>([]);
@@ -274,13 +276,17 @@ export default function EmployeeHub() {
       return;
     }
 
-    void loadDashboardData(currentEmployee.id);
+    const key = `${currentEmployee.id}:${hubQuarter}`;
+    if (dashboardKey.current === key) return;
+    const quiet = dashboardKey.current !== null;
+    dashboardKey.current = key;
+    void loadDashboardData(currentEmployee.id, quiet);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDashboardData closes over many hub fields
   }, [activeTab, currentEmployee?.id, user, ghcMode, hubQuarter]);
 
-  const loadDashboardData = async (employeeId: string) => {
+  const loadDashboardData = async (employeeId: string, quiet = false) => {
     if (!user) return;
-    setDashboardLoading(true);
+    if (!quiet) setDashboardLoading(true);
     setBoom360DashMeta(null);
     setBoom360Pending(null);
     setDashboardScoreSource('none');
@@ -725,13 +731,13 @@ export default function EmployeeHub() {
 
   // Load rankings
   useEffect(() => {
-    if (activeTab === 'rankings') {
-      loadRankings();
-    }
+    if (activeTab !== 'rankings' || rankingsLoaded.current) return;
+    rankingsLoaded.current = true;
+    void loadRankings();
   }, [activeTab]);
 
-  const loadRankings = async () => {
-    setRankingsLoading(true);
+  const loadRankings = async (quiet = false) => {
+    if (!quiet) setRankingsLoading(true);
     try {
       const ranked = await fetchOrgPerformanceRankings();
       setRankings(ranked);
@@ -747,20 +753,20 @@ export default function EmployeeHub() {
     const channel = supabase
       .channel('employee-hub-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'survey_responses' }, () => {
-        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id);
-        if (activeTab === 'rankings') void loadRankings();
+        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id, true);
+        if (activeTab === 'rankings') void loadRankings(true);
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'survey_answers' }, () => {
-        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id);
-        if (activeTab === 'rankings') void loadRankings();
+        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id, true);
+        if (activeTab === 'rankings') void loadRankings(true);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'assessment_responses' }, () => {
-        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id);
-        if (activeTab === 'rankings') void loadRankings();
+        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id, true);
+        if (activeTab === 'rankings') void loadRankings(true);
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'assessment_answers' }, () => {
-        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id);
-        if (activeTab === 'rankings') void loadRankings();
+        if (activeTab === 'dashboard' && currentEmployee?.id) void loadDashboardData(currentEmployee.id, true);
+        if (activeTab === 'rankings') void loadRankings(true);
       })
       .subscribe();
 
@@ -977,7 +983,7 @@ export default function EmployeeHub() {
       next.set('tab', tab);
       if (tab !== 'projects') next.delete('project');
       return next;
-    });
+    }, { replace: true });
   };
 
   const openProject = (id: string | null) => {

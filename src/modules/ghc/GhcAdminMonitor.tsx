@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -62,11 +63,12 @@ export default function GhcAdminMonitor({
   } | null>(null);
   const [selected360, setSelected360] = useState<GhcNamed360Row | null>(null);
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [evalId, setEvalId] = useState('');
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
 
   const refresh = async () => {
-    setLoading(true);
+    startLoading();
     try {
       const [s, list, people, named, status] = await Promise.all([
         ghcGetAdminSummary(periodQuarter, periodMonth),
@@ -84,7 +86,7 @@ export default function GhcAdminMonitor({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Admin summary failed');
     } finally {
-      setLoading(false);
+      finishLoading();
     }
   };
 

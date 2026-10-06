@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -74,22 +75,23 @@ export default function BoomInsightsPanel({
   const periodQuarter = periodQuarterProp ?? localQuarter;
   const setPeriodQuarter = onPeriodQuarterChange ?? setLocalQuarter;
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [overview, setOverview] = useState<Overview | null>(null);
 
   const canView = isAdmin || viewerHierarchyLevel === 0;
 
   const load = useCallback(async () => {
     if (!canView) {
-      setLoading(false);
+      finishLoading();
       return;
     }
-    setLoading(true);
+    startLoading();
     const { data, error } = await supabase.rpc('get_eo_executive_overview', {
       _period_quarter: periodQuarter,
     });
     setOverview(error ? null : (data as Overview));
-    setLoading(false);
-  }, [canView, periodQuarter]);
+    finishLoading();
+  }, [canView, finishLoading, periodQuarter, startLoading]);
 
   useEffect(() => {
     void load();

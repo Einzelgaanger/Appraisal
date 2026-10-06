@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -39,23 +40,24 @@ export default function GhcDirectoryPanel({
   const { tenant } = useTenant();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [onlyReports, setOnlyReports] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      startLoading();
       try {
         const data = await ghcGetDirectory(periodQuarter, periodMonth);
         if (!cancelled) setRows(data as Row[]);
       } catch {
         if (!cancelled) setRows([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) finishLoading();
       }
     })();
     return () => { cancelled = true; };
-  }, [periodQuarter, periodMonth]);
+  }, [finishLoading, periodQuarter, periodMonth, startLoading]);
 
   const myReports = useMemo(() => {
     if (!viewerEmployeeId) return [];

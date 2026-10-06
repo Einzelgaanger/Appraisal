@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFormAutosave } from '@/hooks/useFormAutosave';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 
 type Row = {
   reviewee_id: string;
@@ -31,6 +32,7 @@ export default function BoomCommentsPanel({
   receivesComments,
 }: BoomCommentsPanelProps) {
   const [loading, setLoading] = useState(false);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [toGive, setToGive] = useState<Row[]>([]);
   const [received, setReceived] = useState<{ comment_text: string }[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -72,9 +74,9 @@ export default function BoomCommentsPanel({
   }, [reviewerEmployeeId, periodQuarter, receivesComments]);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([loadGive(), loadReceived()]).finally(() => setLoading(false));
-  }, [loadGive, loadReceived]);
+    startLoading();
+    Promise.all([loadGive(), loadReceived()]).finally(() => finishLoading());
+  }, [finishLoading, loadGive, loadReceived, startLoading]);
 
   const saveComment = async (row: Row, submit: boolean) => {
     if (!reviewerEmployeeId) return;

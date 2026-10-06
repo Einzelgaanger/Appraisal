@@ -40,12 +40,13 @@ const TabsContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
+    {...props}
     ref={ref}
+    forceMount
     className={cn(
-      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary data-[state=inactive]:hidden",
       className,
     )}
-    {...props}
   />
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;

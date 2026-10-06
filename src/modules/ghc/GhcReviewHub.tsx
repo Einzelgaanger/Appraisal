@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -117,13 +117,16 @@ export default function GhcReviewHub({
     [setSearchParams],
   );
 
+  const tasksKey = useRef<string | null>(null);
   const load = useCallback(async () => {
     if (!employeeId) return;
-    setLoading(true);
+    const key = `${employeeId}:${periodMonth}:${periodQuarter}`;
+    if (tasksKey.current !== key) setLoading(true);
     setLoadError(null);
     try {
       const rows = await ghcGetMyTasks(periodMonth, periodQuarter);
       setTasks(rows);
+      tasksKey.current = key;
     } catch (e) {
       console.error(e);
       const raw = e instanceof Error ? e.message : 'Could not load appraisal tasks';

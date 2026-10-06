@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuietLoader } from '@/hooks/useQuietLoader';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -259,6 +260,7 @@ export default function BoomDiscussionsPanel({
   const oversight = canViewPeer360Oversight(reviewerHierarchyLevel, isPlatformAdmin)
     || isBoomOversightViewer(reviewerEmail, reviewerHierarchyLevel);
   const [loading, setLoading] = useState(false);
+  const { start: startLoading, finish: finishLoading } = useQuietLoader(setLoading);
   const [inbox, setInbox] = useState<InboxRow[]>([]);
   const [oversightRoster, setOversightRoster] = useState<OversightRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -324,10 +326,10 @@ export default function BoomDiscussionsPanel({
   }, []);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    startLoading();
     await Promise.all([loadInbox(), loadOversightRoster()]);
-    setLoading(false);
-  }, [loadInbox, loadOversightRoster]);
+    finishLoading();
+  }, [finishLoading, loadInbox, loadOversightRoster, startLoading]);
 
   useEffect(() => {
     void refresh();
