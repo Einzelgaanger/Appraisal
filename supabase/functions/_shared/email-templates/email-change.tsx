@@ -36,6 +36,9 @@ export const EmailChangeEmail = ({
         . Please confirm this change by clicking the button below.
       </Text>
       <CtaBlock brand={brand} href={confirmationUrl} label="Confirm Email Change" />
+      <Text style={{ ...styles.text, fontSize: '12px', margin: '22px 0 0', color: brand.muted }}>
+        On the page, choose Continue. That tap is what confirms the change.
+      </Text>
     </BrandedEmailFrame>
   )
 }

@@ -33,6 +33,9 @@ export const SignupEmail = ({
         ).
       </Text>
       <CtaBlock brand={brand} href={confirmationUrl} label="Verify Access" />
+      <Text style={{ ...styles.text, fontSize: '12px', margin: '22px 0 0', color: brand.muted }}>
+        On the page, choose Continue. That tap is what confirms your email.
+      </Text>
     </BrandedEmailFrame>
   )
 }

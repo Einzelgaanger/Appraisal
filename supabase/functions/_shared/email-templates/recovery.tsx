@@ -25,11 +25,11 @@ export const RecoveryEmail = ({
       footer="If you weren't expecting this email, you can safely ignore it — no changes will be made to your account."
     >
       <Text style={styles.text}>
-        You're a step away from your {brand.siteName} {brand.productName}. Tap the button below to choose a new password — then we'll guide you through confirming your profile and opening your workspace.
+        You're a step away from your {brand.siteName} {brand.productName}. Open the page below and set your password there — then we'll guide you through confirming your profile and opening your workspace.
       </Text>
       <CtaBlock brand={brand} href={confirmationUrl} label="Set New Password" />
       <Text style={{ ...styles.text, fontSize: '12px', margin: '22px 0 0', color: brand.muted }}>
-        For your security, this link will expire shortly. If it does, just request a new one from the sign-in page.
+        On the page, choose Continue, then set your password. Use the newest email if you request more than one — older links stop working as soon as a newer one is sent.
       </Text>
     </BrandedEmailFrame>
   )

@@ -29,6 +29,9 @@ export const InviteEmail = ({
         You have been invited to join the {brand.siteName} {brand.productName}. Click below to accept your invitation and set up your account.
       </Text>
       <CtaBlock brand={brand} href={confirmationUrl} label="Accept Invite" />
+      <Text style={{ ...styles.text, fontSize: '12px', margin: '22px 0 0', color: brand.muted }}>
+        On the page, choose Continue. That tap is what opens your account.
+      </Text>
     </BrandedEmailFrame>
   )
 }

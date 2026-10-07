@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,68 @@ import { getTenantBrandAssets } from '@/tenants/brandingAssets';
 import { isGhcStyleAppraisal } from '@/tenants/config';
 import { isSharedDemoPassword, SHARED_PASSWORD_MESSAGE } from '@/lib/sharedPasswords';
 
+const OTP_TYPES = new Set<EmailOtpType>(['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email']);
+
+function otpTypeFromParam(raw: string | null): EmailOtpType {
+  const key = (raw || 'recovery').trim().toLowerCase();
+  const normalized = key === 'magic_link'
+    ? 'magiclink'
+    : key.startsWith('email_change')
+      ? 'email_change'
+      : key;
+  return OTP_TYPES.has(normalized as EmailOtpType) ? (normalized as EmailOtpType) : 'recovery';
+}
+
+/** Mail scanners burn a link by opening it. Say that, instead of blaming a short timer. */
+function friendlyLinkError(raw: string, code: string | null): string {
+  const consumed = code === 'otp_expired' || /invalid or has expired/i.test(raw);
+  if (consumed) {
+    return 'This link was opened once already, so it cannot be used again. Email security checks often open password links before you do. Request a new link and use the newest email.';
+  }
+  return raw;
+}
+
+type PendingLink =
+  | { kind: 'otp'; tokenHash: string; otpType: EmailOtpType }
+  | { kind: 'code'; code: string }
+  | { kind: 'session'; accessToken: string; refreshToken: string };
+
+function pendingLinkFromLocation(): { pending: PendingLink | null; error: string | null } {
+  const url = new URL(window.location.href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+  const described = hash.get('error_description') ?? url.searchParams.get('error_description');
+  if (described) {
+    const code = hash.get('error_code') ?? url.searchParams.get('error_code');
+    return { pending: null, error: friendlyLinkError(described, code) };
+  }
+
+  const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
+  const code = url.searchParams.get('code');
+  const accessToken = hash.get('access_token');
+  const refreshToken = hash.get('refresh_token');
+
+  if (accessToken && refreshToken) {
+    return { pending: { kind: 'session', accessToken, refreshToken }, error: null };
+  }
+  if (tokenHash) {
+    return {
+      pending: { kind: 'otp', tokenHash, otpType: otpTypeFromParam(url.searchParams.get('type')) },
+      error: null,
+    };
+  }
+  if (code) return { pending: { kind: 'code', code }, error: null };
+  return { pending: null, error: null };
+}
+
 /** Drop the consumed recovery token from the address bar, including an older fragment token. */
 function stripTokensFromUrl() {
   const url = new URL(window.location.href);
-  for (const key of ['token_hash', 'token', 'code', 'type']) url.searchParams.delete(key);
-  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  for (const key of ['token_hash', 'token', 'code', 'type', 'error', 'error_code', 'error_description']) {
+    url.searchParams.delete(key);
+  }
+  url.hash = '';
+  const search = url.searchParams.toString();
+  window.history.replaceState({}, '', `${url.pathname}${search ? `?${search}` : ''}`);
 }
 
 export default function ResetPassword() {
@@ -29,97 +87,121 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [linkState, setLinkState] = useState<'verifying' | 'ready' | 'invalid'>('verifying');
+  const [linkState, setLinkState] = useState<'confirm' | 'verifying' | 'ready' | 'invalid'>('verifying');
+  const [confirmType, setConfirmType] = useState<EmailOtpType>('recovery');
   const [linkError, setLinkError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const pendingRef = useRef<PendingLink | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
 
-    const settle = (state: 'ready' | 'invalid', message = '') => {
+    const settle = (state: 'confirm' | 'ready' | 'invalid', message = '') => {
       if (cancelled) return;
       setLinkState(state);
       setLinkError(message);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // A token in the address bar is waiting for an explicit tap. An existing
+      // session must not skip that tap, or a mail scanner that runs the page
+      // would still use the link up.
+      if (pendingRef.current) return;
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) settle('ready');
     });
 
-    void (async () => {
-      const url = new URL(window.location.href);
-      const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
-
-      // An expired or already-used link arrives as a description in the fragment
-      // rather than as a thrown error.
-      const described = hash.get('error_description') ?? url.searchParams.get('error_description');
-      if (described) {
-        settle('invalid', described);
-        return;
-      }
-
-      // Depending on how the email template and auth flow are configured, the
-      // token reaches us as a verifiable hash, a PKCE code, or (handled by
-      // detectSessionInUrl) an access token in the fragment. Accept all three so
-      // the flow does not depend on one Supabase project setting.
-      const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
-      const code = url.searchParams.get('code');
-      const accessToken = hash.get('access_token');
-      const refreshToken = hash.get('refresh_token');
-
-      // Links issued before the code flow still carry the session in the fragment.
-      // Accept them once, then remove them from the address bar.
-      if (accessToken && refreshToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        stripTokensFromUrl();
-        settle(sessionError ? 'invalid' : 'ready', sessionError?.message ?? '');
-        return;
-      }
-
-      if (tokenHash) {
-        const { error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'recovery',
-        });
-        stripTokensFromUrl();
-        settle(verifyError ? 'invalid' : 'ready', verifyError?.message ?? '');
-        return;
-      }
-
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        stripTokensFromUrl();
-        settle(exchangeError ? 'invalid' : 'ready', exchangeError?.message ?? '');
-        return;
-      }
-
-      // detectSessionInUrl consumes the fragment asynchronously, so poll briefly
-      // instead of declaring the link dead on the first miss.
-      const deadline = Date.now() + 4000;
-      while (!cancelled) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          stripTokensFromUrl();
-          settle('ready');
-          return;
+    const parsed = pendingLinkFromLocation();
+    if (parsed.error) {
+      settle('invalid', parsed.error);
+    } else if (parsed.pending) {
+      pendingRef.current = parsed.pending;
+      if (parsed.pending.kind === 'otp') setConfirmType(parsed.pending.otpType);
+      settle('confirm');
+    } else {
+      void (async () => {
+        // Someone who already continued, then refreshed, still has a session.
+        const deadline = Date.now() + 4000;
+        while (!cancelled) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            stripTokensFromUrl();
+            settle('ready');
+            return;
+          }
+          if (Date.now() > deadline) break;
+          await new Promise((resolve) => setTimeout(resolve, 250));
         }
-        if (Date.now() > deadline) break;
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-
-      settle('invalid');
-    })();
+        settle('invalid');
+      })();
+    }
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
   }, []);
+
+  const redeemLink = async () => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    setLinkState('verifying');
+    setLinkError('');
+
+    try {
+      if (pending.kind === 'session') {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: pending.accessToken,
+          refresh_token: pending.refreshToken,
+        });
+        stripTokensFromUrl();
+        pendingRef.current = null;
+        if (sessionError) {
+          setLinkState('invalid');
+          setLinkError(friendlyLinkError(sessionError.message, null));
+          return;
+        }
+        setLinkState('ready');
+        return;
+      }
+
+      if (pending.kind === 'otp') {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: pending.tokenHash,
+          type: pending.otpType,
+        });
+        stripTokensFromUrl();
+        pendingRef.current = null;
+        if (verifyError) {
+          setLinkState('invalid');
+          setLinkError(friendlyLinkError(verifyError.message, null));
+          return;
+        }
+        if (pending.otpType !== 'recovery') {
+          navigate('/hub');
+          return;
+        }
+        setLinkState('ready');
+        return;
+      }
+
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(pending.code);
+      stripTokensFromUrl();
+      pendingRef.current = null;
+      if (exchangeError) {
+        setLinkState('invalid');
+        setLinkError(friendlyLinkError(exchangeError.message, null));
+        return;
+      }
+      setLinkState('ready');
+    } catch (err) {
+      pendingRef.current = null;
+      stripTokensFromUrl();
+      setLinkState('invalid');
+      setLinkError(err instanceof Error ? err.message : 'This link could not be opened.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,6 +278,41 @@ export default function ResetPassword() {
     );
   }
 
+  if (linkState === 'confirm') {
+    return (
+      <div className="mobile-flow-shell app-page flex items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mobile-flow-card max-w-sm w-full text-center"
+        >
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <Lock className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="mb-1.5 text-xl font-semibold">
+            {confirmType === 'magiclink'
+              ? 'Continue to sign in'
+              : confirmType === 'email_change'
+                ? 'Continue to confirm your email'
+                : confirmType === 'recovery'
+                  ? 'Continue to set your password'
+                  : 'Continue to open your account'}
+          </h1>
+          <p className="mb-5 text-[13px] text-muted-foreground">
+            Tap continue on this page. Email security checks open links automatically, and waiting
+            for this tap keeps yours working.
+          </p>
+          <Button type="button" onClick={() => void redeemLink()} className="h-11 w-full rounded-md text-sm">
+            Continue
+          </Button>
+          <Button asChild variant="ghost" className="mt-2 h-10 w-full text-sm">
+            <Link to="/login">Back to sign in</Link>
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (linkState === 'invalid') {
     return (
       <div className="mobile-flow-shell app-page flex items-center justify-center px-6">
@@ -209,14 +326,8 @@ export default function ResetPassword() {
           </div>
           <h1 className="mb-1.5 text-xl font-semibold">This link is no longer valid</h1>
           <p className="mb-5 text-[13px] text-muted-foreground">
-            Password links expire after a short while and can only be used once. Request a fresh one
-            and it will work straight away.
+            {linkError || 'Request a new link and open the newest email. Older ones stop working as soon as a newer one is sent.'}
           </p>
-          {linkError && (
-            <p className="mb-5 rounded-md bg-muted/50 p-2.5 text-[11px] text-muted-foreground">
-              {linkError}
-            </p>
-          )}
           <Button asChild className="h-11 w-full rounded-md text-sm">
             <Link to="/find-account">Send me a new link</Link>
           </Button>

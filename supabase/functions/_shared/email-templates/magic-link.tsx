@@ -28,6 +28,9 @@ export const MagicLinkEmail = ({
         Click the button below to securely sign in to your {brand.siteName} {brand.productName}. For security, this link is single-use and will expire shortly.
       </Text>
       <CtaBlock brand={brand} href={confirmationUrl} label="Sign In" />
+      <Text style={{ ...styles.text, fontSize: '12px', margin: '22px 0 0', color: brand.muted }}>
+        On the page, choose Continue. That tap is what signs you in.
+      </Text>
     </BrandedEmailFrame>
   )
 }

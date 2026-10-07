@@ -175,8 +175,8 @@ export default function FindAccount() {
           <div className="space-y-2 text-left bg-muted/50 rounded-md p-3.5 mb-6">
             <p className="text-[11px] font-semibold text-foreground mb-1.5">What happens next:</p>
             <ol className="text-[11px] text-muted-foreground space-y-1.5 list-decimal list-inside">
-              <li>Open the email and tap the link</li>
-              <li>Set your new password</li>
+              <li>Open the newest email and tap the button</li>
+              <li>On the page, choose Continue, then set your password</li>
               {resetMode
                 ? <li>Sign in and pick up where you left off</li>
                 : <li>Confirm your profile details, then start your appraisals</li>}
@@ -227,7 +227,7 @@ export default function FindAccount() {
               {resetMode ? (
                 <>
                   Enter your work email or find your name below, and we&apos;ll send you a link to set a
-                  new password. The link works once and expires shortly after.
+                  new password. Open the newest email, then choose Continue on the page.
                 </>
               ) : (
                 <>

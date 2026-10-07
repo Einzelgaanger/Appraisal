@@ -9,6 +9,7 @@ import { RecoveryEmail } from '../_shared/email-templates/recovery.tsx'
 import { EmailChangeEmail } from '../_shared/email-templates/email-change.tsx'
 import { ReauthenticationEmail } from '../_shared/email-templates/reauthentication.tsx'
 import { sendResendEmail } from '../_shared/send-resend.ts'
+import { authEmailLink } from '../_shared/auth-confirm-url.ts'
 import {
   brandFromSlug,
   emailSubject,
@@ -68,13 +69,13 @@ function templateKey(action: string | undefined): string {
 }
 
 function confirmationUrl(emailData: EmailData): string {
-  const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
-  const params = new URLSearchParams({
-    token: emailData.token_hash || '',
-    type: emailData.email_action_type || '',
+  return authEmailLink({
+    tokenHash: emailData.token_hash,
+    emailActionType: emailData.email_action_type,
+    redirectTo: emailData.redirect_to,
+    siteUrl: emailData.site_url,
+    supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
   })
-  if (emailData.redirect_to) params.set('redirect_to', emailData.redirect_to)
-  return `${base}/auth/v1/verify?${params.toString()}`
 }
 
 function sender(brand: EmailBrand): string {
