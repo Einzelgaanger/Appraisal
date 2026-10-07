@@ -61,7 +61,7 @@ export default function WallOfFame() {
         ]}
       />
 
-      <div className="lg:pl-72">
+      <div className="app-sidebar-offset">
       <main className="platform-content section-stack">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
           <h1 className="text-2xl font-bold font-serif mb-2">Performance Rankings</h1>

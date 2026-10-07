@@ -1083,20 +1083,24 @@ export default function EmployeeHub() {
         ]}
         actions={
           <>
-            {ghcMode ? <GhcNotificationsBell /> : <BoomNotificationsBell />}
+            {ghcMode ? (
+              <GhcNotificationsBell className="h-8 w-full justify-start gap-2 rounded-xl px-2.5 text-[12.5px] font-medium normal-case tracking-normal" />
+            ) : (
+              <BoomNotificationsBell className="h-8 rounded-xl px-2.5 font-sans text-[12.5px] font-medium normal-case tracking-normal" />
+            )}
             {isPlatformAdmin && (
-              <Button variant="outline" size="sm" asChild className="h-10 w-full gap-2 rounded-2xl border-primary/30 font-sans text-[13px] font-medium normal-case tracking-normal text-primary">
+              <Button variant="outline" size="sm" asChild className="h-8 w-full gap-2 rounded-xl border-primary/30 font-sans text-[12.5px] font-medium normal-case tracking-normal text-primary">
                 <Link to="/appraisal"><Shield className="w-4 h-4" /> Admin console</Link>
               </Button>
             )}
             {ghcMode && isCompanyAdmin && !isPlatformAdmin && (
-              <Button variant="outline" size="sm" asChild className="h-10 w-full gap-2 rounded-2xl border-primary/30 font-sans text-[13px] font-medium normal-case tracking-normal text-primary">
+              <Button variant="outline" size="sm" asChild className="h-8 w-full gap-2 rounded-xl border-primary/30 font-sans text-[12.5px] font-medium normal-case tracking-normal text-primary">
                 <Link to={`/hub?tab=survey&tenant=${tenant.slug}&ghcTab=admin&ghcQuarter=${hubQuarter}`}>
                   <Shield className="w-4 h-4" /> HR monitor
                 </Link>
               </Button>
             )}
-            <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-muted-foreground px-1">
+            <div className="sidebar-footnote hidden items-center gap-1.5 px-1 text-[11px] text-current/55 lg:flex">
               <Shield className="w-3.5 h-3.5" />
               <span>Anonymous</span>
             </div>
@@ -1105,7 +1109,7 @@ export default function EmployeeHub() {
       />
 
       {/* Tabs */}
-      <div className="lg:pl-72">
+      <div className="app-sidebar-offset">
       <header
         className="app-sticky-header border-b border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}

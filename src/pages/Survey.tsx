@@ -183,7 +183,7 @@ export default function Survey() {
         ]}
       />
 
-      <div className="lg:pl-72">
+      <div className="app-sidebar-offset">
       {/* Step Indicator */}
       {step !== 'submitted' && (
         <div className="platform-canvas pt-6 pb-2">

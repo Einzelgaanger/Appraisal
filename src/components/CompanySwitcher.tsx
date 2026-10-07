@@ -41,7 +41,7 @@ export default function CompanySwitcher({ branded = false }: { branded?: boolean
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-[13px] transition-colors',
+          'flex h-8 w-full items-center justify-between gap-2 rounded-xl border px-2.5 text-left text-[12.5px] transition-colors',
           branded
             ? 'border-white/25 text-white hover:bg-white/10'
             : 'border-border hover:bg-muted/50',
@@ -58,7 +58,13 @@ export default function CompanySwitcher({ branded = false }: { branded?: boolean
         )}
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-60">
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        collisionPadding={12}
+        className="max-h-[min(70dvh,22rem)] w-[max(16rem,var(--app-sidebar-w))] max-w-[18rem] overflow-y-auto"
+      >
         <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
           You work across {companies.length} companies
         </DropdownMenuLabel>

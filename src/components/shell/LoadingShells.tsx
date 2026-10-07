@@ -16,7 +16,7 @@ function PhaseSkeleton({ className, isActive, ...props }: React.ComponentProps<t
 export function AppBootstrapSkeleton() {
   return (
     <div className="app-page min-h-screen flex">
-      <div className="hidden lg:flex w-72 shrink-0 flex-col gap-4 border-r border-border/60 bg-sidebar p-5 text-sidebar-foreground">
+      <div className="hidden lg:flex w-[var(--app-sidebar-w)] shrink-0 flex-col gap-4 border-r border-border/60 bg-sidebar p-5 text-sidebar-foreground">
         <PhaseSkeleton isActive className="h-9 w-28 bg-sidebar-accent/40" />
         <div className="space-y-2 pt-4">
           <PhaseSkeleton isActive className="h-10 w-full bg-sidebar-accent/35" />
@@ -44,7 +44,7 @@ export function AppBootstrapSkeleton() {
 
 function SidebarStrip({ isActive }: { isActive: boolean }) {
   return (
-    <div className="hidden lg:flex w-72 shrink-0 flex-col gap-4 border-r border-border/60 bg-sidebar p-5">
+    <div className="hidden lg:flex w-[var(--app-sidebar-w)] shrink-0 flex-col gap-4 border-r border-border/60 bg-sidebar p-5">
       <PhaseSkeleton isActive={isActive} className="h-8 w-32 bg-sidebar-accent/40" />
       <div className="space-y-2 pt-2">
         <PhaseSkeleton isActive={isActive} className="h-10 w-full bg-sidebar-accent/35" />
@@ -61,7 +61,7 @@ export function PlatformHubSkeleton() {
     <div className="app-page flex min-h-screen">
       <div className="app-page-grid" />
       <SidebarStrip isActive />
-      <div className="flex flex-1 flex-col lg:pl-72">
+      <div className="flex flex-1 flex-col min-w-0">
         <div className="platform-content section-stack p-6 space-y-6">
           <PhaseSkeleton isActive className="h-10 w-full max-w-md" />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -82,7 +82,7 @@ export function AdminDashboardSkeleton() {
     <div className="app-page flex min-h-screen">
       <div className="app-page-grid" />
       <SidebarStrip isActive />
-      <div className="flex flex-1 flex-col lg:pl-72">
+      <div className="flex flex-1 flex-col min-w-0">
         <main className="platform-content section-stack p-6 space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
             <PhaseSkeleton isActive className="h-12 flex-1 max-w-xl rounded-xl" />
@@ -168,7 +168,7 @@ export function EmployeeDashboardPageSkeleton() {
     <div className="app-page flex min-h-screen">
       <div className="app-page-grid" />
       <SidebarStrip isActive />
-      <div className="flex flex-1 flex-col lg:pl-72">
+      <div className="flex flex-1 flex-col min-w-0">
         <div className="platform-content section-stack p-6">
           <EmployeeDashboardTabSkeleton />
         </div>
@@ -183,7 +183,7 @@ export function WallOfFamePageSkeleton() {
     <div className="app-page flex min-h-screen">
       <div className="app-page-grid" />
       <SidebarStrip isActive />
-      <div className="flex flex-1 flex-col lg:pl-72">
+      <div className="flex flex-1 flex-col min-w-0">
         <div className="platform-content section-stack p-6">
           <RankingsTabSkeleton />
         </div>

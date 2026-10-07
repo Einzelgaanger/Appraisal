@@ -49,6 +49,7 @@
     --paper-deep: 154 48% 90%;
 
     --radius: 0.5rem;
+    --app-sidebar-w: 14rem;
 
     --chart-1: 202 65% 46%;
     --chart-2: 107 52% 49%;
@@ -306,6 +307,23 @@
   .app-fixed-sidebar {
     top: var(--app-banner-h, 0px);
     height: calc(100dvh - var(--app-banner-h, 0px));
+    width: var(--app-sidebar-w, 14rem);
+  }
+
+  @media (min-width: 1024px) {
+    .app-sidebar-offset {
+      padding-left: var(--app-sidebar-w, 14rem);
+    }
+
+    .app-fixed-sidebar,
+    .app-sidebar-offset {
+      transition: width 180ms ease, padding-left 180ms ease;
+    }
+  }
+
+  html[data-sidebar-resizing='true'] .app-fixed-sidebar,
+  html[data-sidebar-resizing='true'] .app-sidebar-offset {
+    transition: none;
   }
 
   .app-page-grid { display: none; }
@@ -669,13 +687,19 @@
   }
 
   .sidebar-nav {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, currentColor 35%, transparent) transparent;
   }
   .sidebar-nav::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
+    display: block;
+    width: 8px;
+    height: 8px;
+  }
+  .sidebar-nav::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, currentColor 35%, transparent);
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   .scrollbar-thin {
@@ -855,4 +879,102 @@
   font-weight: 500;
   color: hsl(var(--muted-foreground));
   border-bottom: 1.5px solid hsl(var(--foreground) / 0.15);
+}
+
+/* Sidebar packing. Unlayered so density and collapse win over utility classes. */
+.sidebar-brand-band { height: 3rem; }
+.sidebar-identity { padding: 0.625rem 0.875rem; }
+.sidebar-nav { padding: 0.375rem 0.8rem 0.5rem 0.375rem; }
+.sidebar-row { min-height: 2.25rem; }
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.5rem;
+}
+.sidebar-meta-compact,
+.sidebar-collapsed-mark { display: none; }
+.sidebar-scroll-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  z-index: 2;
+  height: 0.875rem;
+}
+.sidebar-scroll-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--sidebar-fade, transparent), transparent);
+}
+.sidebar-scroll-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--sidebar-fade, transparent), transparent);
+}
+
+html[data-sidebar-density='compact'] .sidebar-brand-band { height: 2.75rem; }
+html[data-sidebar-density='compact'] .sidebar-identity { padding: 0.5rem 0.75rem; }
+html[data-sidebar-density='compact'] .sidebar-row { min-height: 2rem; padding-top: 0; padding-bottom: 0; }
+html[data-sidebar-density='compact'] .sidebar-footer { padding: 0.375rem; gap: 0.25rem; }
+html[data-sidebar-density='compact'] .sidebar-footnote { display: none; }
+
+html[data-sidebar-density='tight'] .sidebar-brand-band { height: 2.5rem; }
+html[data-sidebar-density='tight'] .sidebar-identity { padding: 0.375rem 0.75rem 0.5rem; }
+html[data-sidebar-density='tight'] .sidebar-parent-credit,
+html[data-sidebar-density='tight'] .sidebar-meta { display: none; }
+html[data-sidebar-density='tight'] .sidebar-meta-compact { display: block; }
+html[data-sidebar-density='tight'] .sidebar-row { min-height: 1.875rem; padding-top: 0; padding-bottom: 0; }
+html[data-sidebar-density='tight'] .sidebar-footer { padding: 0.25rem 0.375rem; gap: 0.25rem; }
+html[data-sidebar-density='tight'] .sidebar-footnote { display: none; }
+
+html[data-sidebar-collapsed='true'] .sidebar-identity,
+html[data-sidebar-collapsed='true'] .sidebar-wordmark,
+html[data-sidebar-collapsed='true'] .sidebar-label,
+html[data-sidebar-collapsed='true'] .sidebar-chevron,
+html[data-sidebar-collapsed='true'] .sidebar-children,
+html[data-sidebar-collapsed='true'] .sidebar-parent-credit,
+html[data-sidebar-collapsed='true'] .sidebar-brand-art,
+html[data-sidebar-collapsed='true'] .sidebar-banner-img,
+html[data-sidebar-collapsed='true'] .sidebar-footnote {
+  display: none;
+}
+html[data-sidebar-collapsed='true'] .sidebar-collapsed-mark {
+  display: block;
+  height: 2rem;
+  width: 2rem;
+  margin-inline: auto;
+  object-fit: contain;
+}
+html[data-sidebar-collapsed='true'] .sidebar-brand-lockup {
+  width: 100%;
+  justify-content: center;
+  padding-left: 0;
+}
+html[data-sidebar-collapsed='true'] .sidebar-brand-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+html[data-sidebar-collapsed='true'] .sidebar-row {
+  justify-content: center;
+  gap: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+html[data-sidebar-collapsed='true'] .sidebar-footer :is(a, button) {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 0;
+  margin-inline: auto;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 0;
+  justify-content: center;
+  border-radius: 0.75rem;
+}
+html[data-sidebar-collapsed='true'] .sidebar-footer svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
 }

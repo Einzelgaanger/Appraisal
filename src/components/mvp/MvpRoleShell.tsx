@@ -77,7 +77,7 @@ export default function MvpRoleShell({ role, activeNav, onNav, children }: Props
 
   return (
     <div className="relative min-h-[calc(100vh-4.5rem)]">
-      <aside className="hidden lg:flex fixed left-0 top-[4.25rem] bottom-0 z-30 w-72 flex-col border-r border-border bg-background">
+      <aside className="hidden lg:flex fixed left-0 top-[4.25rem] bottom-0 z-30 w-[var(--app-sidebar-w)] flex-col border-r border-border bg-background">
         <div className="px-6 pt-6 pb-5 border-b border-border shrink-0">
           <img src={vggLogo} alt="Venture Garden Group" className="h-8 w-auto" />
           <div className="mt-5">
@@ -127,7 +127,7 @@ export default function MvpRoleShell({ role, activeNav, onNav, children }: Props
         </div>
       </aside>
 
-      <div className="min-w-0 bg-[hsl(var(--paper))] lg:pl-72">
+      <div className="app-sidebar-offset min-w-0 bg-[hsl(var(--paper))]">
         <header
           className="lg:hidden sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-md"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}

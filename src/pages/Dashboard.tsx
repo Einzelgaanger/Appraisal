@@ -106,14 +106,14 @@ ${feedbackData.continueDoing || '• No feedback available'}`;
         ]}
         actions={
           ENABLE_APP_AI ? (
-            <Button onClick={() => setChatOpen(true)} size="sm" className="w-full gap-2">
+            <Button onClick={() => setChatOpen(true)} size="sm" className="h-8 w-full gap-2 rounded-xl font-sans text-[12.5px] font-medium normal-case tracking-normal">
               <Zap className="w-4 h-4" /> Analytics assistant
             </Button>
           ) : undefined
         }
       />
 
-      <div className="lg:pl-72">
+      <div className="app-sidebar-offset">
       <main className="platform-content section-stack has-admin-mobile-nav">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <FilterPanel filters={filters} setFilters={setFilters} uniqueManagers={uniqueManagers} uniqueRelationships={uniqueRelationships} />

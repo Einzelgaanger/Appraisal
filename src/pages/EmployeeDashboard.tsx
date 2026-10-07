@@ -167,7 +167,7 @@ export default function EmployeeDashboard() {
         ]}
       />
 
-      <div className="lg:pl-72">
+      <div className="app-sidebar-offset">
       <main className="platform-content section-stack">
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
