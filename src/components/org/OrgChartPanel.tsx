@@ -179,18 +179,21 @@ export default function CompanyOrgChart({ viewerId }: { viewerId?: string | null
           rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
         } else if (tenant.subsidiaryId) {
           const db = supabase as any;
-          const full = await db
+          const activeOnly = tenant.appraisalMode === 'boom';
+          let fullQuery = db
             .from('employees')
             .select('id, name, role, department, additional_roles, additional_departments, hierarchy_level, manager_id, secondary_manager_id')
-            .eq('subsidiary_id', tenant.subsidiaryId)
-            .order('name');
-          const basic = full.error
-            ? await db
-                .from('employees')
-                .select('id, name, role, department, hierarchy_level, manager_id, secondary_manager_id')
-                .eq('subsidiary_id', tenant.subsidiaryId)
-                .order('name')
-            : full;
+            .eq('subsidiary_id', tenant.subsidiaryId);
+          let basicQuery = db
+            .from('employees')
+            .select('id, name, role, department, hierarchy_level, manager_id, secondary_manager_id')
+            .eq('subsidiary_id', tenant.subsidiaryId);
+          if (activeOnly) {
+            fullQuery = fullQuery.eq('eo_appraisal_active', true);
+            basicQuery = basicQuery.eq('eo_appraisal_active', true);
+          }
+          const full = await fullQuery.order('name');
+          const basic = full.error ? await basicQuery.order('name') : full;
           if (basic.error) throw basic.error;
           rows = (basic.data ?? []) as Record<string, unknown>[];
         }

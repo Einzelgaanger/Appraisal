@@ -42,7 +42,7 @@ const SECTIONS: Section[] = [
           </li>
           <li>
             <strong>Leave planner.</strong> Each leave type has its own balance. Annual leave is 10 working days a
-            quarter, with a submission window and a blackout at the start and end of the quarter. One person per
+            quarter. Any working day in the quarter can be chosen, and the request has to be in by the end of week 2. One person per
             department can be on leave at a time. A person cannot apply while their 360 feedback or quarterly
             appraisal for the current quarter is still open. That rule is the same in every company. Every request
             goes to HR first, then to the line manager.
@@ -372,7 +372,7 @@ const SECTIONS: Section[] = [
         </ul>
         <h3>When annual leave may fall</h3>
         <ul>
-          <li>Annual leave cannot fall in the first 14 days of the quarter, or in the last 14 days. If the quarter starts on date Q, allowed dates run from Q+14 through (quarter end − 14).</li>
+          <li>Annual leave can fall on any working day inside the quarter, including the first two weeks and the last two weeks. The start-and-end blackout is not in force.</li>
           <li>Annual leave for the quarter must be submitted by the end of week 2, which is Q+13. After that date an employee cannot submit annual leave. Sick and the other types stay open.</li>
           <li>HR can still place or reschedule after the annual deadline. HR chooses the person, or uses Move on an existing request. A new placement is cleared by HR and then waits for the line manager, unless HR is also that manager or there is no separate manager. The date, quarter, and department checks still run. The week-2 deadline is the only date rule HR can pass, and only for annual leave.</li>
         </ul>
@@ -404,7 +404,7 @@ const SECTIONS: Section[] = [
         <h3>Leave types</h3>
         <p>
           Annual, compassionate, maternity, study, sick, unpaid, parental, and other. Each type has its own allowance.
-          Annual leave is 10 working days a quarter, with the blackout window and the week-2 deadline. The other types
+          Annual leave is 10 working days a quarter, on any working day in that quarter, with the week-2 deadline. The other types
           do not draw from that annual balance.
         </p>
         <h3>Approval chain</h3>
@@ -1087,7 +1087,7 @@ npm run supabase:deploy    # migrations, functions, and secrets`}</code></pre>
           <li><code>has_role()</code> is security definer with a fixed search path, which avoids recursive policy checks.</li>
           <li>Company membership is an allow-list. <code>current_employee_id()</code> ignores an active employee id that was not granted.</li>
           <li>Reviewer identity for peer 360 is stored for integrity and hidden from the reviewee by the RPCs that serve them. HR named views are a separate, role-gated path.</li>
-          <li>Leave rules (quota, blackout, department exclusivity, approval order) run inside the database. The UI mirrors them; it is not the enforcement layer.</li>
+          <li>Leave rules (quota, quarter window, department exclusivity, approval order) run inside the database. The UI mirrors them; it is not the enforcement layer.</li>
           <li>Project visibility is membership plus subsidiary. A crafted project id from another company does not resolve.</li>
           <li>Profile self-service cannot change email, company, manager, or admin flags.</li>
           <li>Avatar writes are limited to the caller’s own prefix in the bucket.</li>

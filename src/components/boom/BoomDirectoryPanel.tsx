@@ -89,7 +89,7 @@ function eaStatusBadge(status: string | undefined) {
   }
 }
 
-const COMPANY_DIRECTORY_CODES = new Set(['l1_uche', 'l1_gisele', 'l1_omotola', 'l1_deyi']);
+const COMPANY_DIRECTORY_CODES = new Set(['l1_uche', 'l1_omotola', 'l1_deyi']);
 
 interface BoomDirectoryPanelProps {
   viewerEmployeeId?: string | null;
@@ -356,8 +356,9 @@ export default function BoomDirectoryPanel({
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {insight.ea_quarterly_submitted ?? 0} of {insight.ea_quarterly_expected ?? 0} assigned manager
-                  evaluation{(insight.ea_quarterly_expected ?? 0) === 1 ? '' : 's'} submitted.
+                  {(insight.ea_quarterly_submitted ?? 0) > 0
+                    ? 'Submitted once for this quarter. Other assigned managers can view it and cannot file a second one.'
+                    : 'Not submitted yet. The first assigned manager to complete it covers this quarter.'}
                 </p>
                 {(insight.ea_quarterly_submissions ?? []).length === 0 ? (
                   <p className="text-xs text-muted-foreground">No Executive Office Quarterly Evaluation started for this period yet.</p>

@@ -111,6 +111,7 @@ export default function AssessmentRunner({
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [responseStatus, setResponseStatus] = useState<string>('draft');
+  const [lockedBy, setLockedBy] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, { score?: number; text?: string; no_opportunity?: boolean }>>({});
   const dirtyRef = useRef(false);
   const draftRef = useRef(draft);
@@ -177,6 +178,7 @@ export default function AssessmentRunner({
   const load = useCallback(async () => {
     if (!open || !reviewerEmployeeId || !revieweeId || !formCode) return;
     setLoading(true);
+    setLockedBy(null);
     try {
       const { data: formRow, error: fe } = await supabase
         .from('assessment_forms')
@@ -213,22 +215,49 @@ export default function AssessmentRunner({
         setOkrRows([]);
       }
 
-      const { data: existing, error: re } = await supabase
-        .from('assessment_responses')
-        .select('id, status')
-        .eq('form_id', formRow.id)
-        .eq('reviewer_id', reviewerEmployeeId)
-        .eq('reviewee_id', revieweeId)
-        .eq('period', period)
-        .maybeSingle();
+      let rid: string | null = null;
+      let st = 'draft';
 
-      if (re) {
-        toast.error('Could not load your response');
-        return;
+      if (formCode === 'ea_quarterly') {
+        const { data: shared, error: sharedError } = await supabase.rpc('ea_quarterly_submitted_for', {
+          _reviewee: revieweeId,
+          _period: period,
+        });
+        if (sharedError) {
+          toast.error(sharedError.message || 'Could not check this quarterly evaluation');
+          return;
+        }
+        const sharedRow = (Array.isArray(shared) ? shared[0] : null) as
+          | { response_id?: string; reviewer_id?: string; reviewer_name?: string }
+          | undefined;
+        if (sharedRow?.response_id) {
+          rid = sharedRow.response_id;
+          st = 'submitted';
+          if (sharedRow.reviewer_id && sharedRow.reviewer_id !== reviewerEmployeeId) {
+            setLockedBy(sharedRow.reviewer_name || 'another manager');
+          }
+        }
       }
 
-      let rid = existing?.id ?? null;
-      let st = existing?.status ?? 'draft';
+      if (!rid) {
+        const { data: existing, error: re } = await supabase
+          .from('assessment_responses')
+          .select('id, status')
+          .eq('form_id', formRow.id)
+          .eq('reviewer_id', reviewerEmployeeId)
+          .eq('reviewee_id', revieweeId)
+          .eq('period', period)
+          .maybeSingle();
+
+        if (re) {
+          toast.error('Could not load your response');
+          return;
+        }
+
+        rid = existing?.id ?? null;
+        st = existing?.status ?? 'draft';
+      }
+
       if (!rid) {
         const { data: ins, error: ie } = await supabase
           .from('assessment_responses')
@@ -544,7 +573,11 @@ export default function AssessmentRunner({
               </p>
             )}
             {readOnly && (
-              <p className="text-xs text-muted-foreground -mt-2">Submitted — read only</p>
+              <p className="text-xs text-muted-foreground -mt-2">
+                {lockedBy
+                  ? `Submitted by ${lockedBy}. This quarter already has one evaluation, so it is not filed again.`
+                  : 'Submitted — read only'}
+              </p>
             )}
             {sections.map((sec) => (
               <div key={sec.order}>

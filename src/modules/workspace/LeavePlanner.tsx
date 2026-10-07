@@ -252,8 +252,8 @@ export default function LeavePlanner({ employeeId }: Props) {
   }, [balance?.department, editingId, endDate, people, requestedDays, rows, startDate, subjectId]);
 
   const outsideWindow = leaveType === 'annual' && (
-    Boolean(startDate && balance?.allowed_start && startDate < balance.allowed_start) ||
-    Boolean(endDate && balance?.allowed_end && endDate > balance.allowed_end)
+    Boolean(startDate && balance?.quarter_start && startDate < balance.quarter_start) ||
+    Boolean(endDate && balance?.quarter_end && endDate > balance.quarter_end)
   );
 
   const resetForm = () => {
@@ -599,7 +599,7 @@ export default function LeavePlanner({ employeeId }: Props) {
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
             Each leave type stands alone. Annual leave is 10 working days in the quarter and does not use up sick, compassionate, maternity, parental, study, unpaid, or other leave.
-            Annual leave cannot fall in the first two weeks or the last two weeks of the quarter, and it has to be in before the end of week 2.
+            Annual leave can fall on any working day in the quarter, and it has to be in before the end of week 2.
             Every request goes to HR first, by email and on this planner, and only then to your line manager.
             You cannot apply while your 360 feedback or quarterly appraisal for this quarter is still open. That holds in every company.
           </p>
@@ -675,8 +675,8 @@ export default function LeavePlanner({ employeeId }: Props) {
                 <Input
                   id="leave-start"
                   type="date"
-                  min={leaveType === 'annual' ? balance?.allowed_start : undefined}
-                  max={leaveType === 'annual' ? balance?.allowed_end : undefined}
+                  min={leaveType === 'annual' ? balance?.quarter_start : undefined}
+                  max={leaveType === 'annual' ? balance?.quarter_end : undefined}
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                 />
@@ -686,8 +686,8 @@ export default function LeavePlanner({ employeeId }: Props) {
                 <Input
                   id="leave-end"
                   type="date"
-                  min={leaveType === 'annual' ? balance?.allowed_start : startDate || undefined}
-                  max={leaveType === 'annual' ? balance?.allowed_end : undefined}
+                  min={leaveType === 'annual' ? (startDate || balance?.quarter_start) : startDate || undefined}
+                  max={leaveType === 'annual' ? balance?.quarter_end : undefined}
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                 />
@@ -725,7 +725,7 @@ export default function LeavePlanner({ employeeId }: Props) {
             )}
             {outsideWindow && (
               <p className="text-xs text-rose-700">
-                Dates must sit between {formatDate(balance?.allowed_start)} and {formatDate(balance?.allowed_end)}.
+                Keep this block inside the quarter, {formatDate(balance?.quarter_start)} to {formatDate(balance?.quarter_end)}.
               </p>
             )}
             {dateConflict && (

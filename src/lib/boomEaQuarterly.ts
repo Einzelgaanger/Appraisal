@@ -78,6 +78,27 @@ export async function fetchMyEaQuarterlyResults(
   };
 }
 
+export type SharedEaQuarterlyRow = {
+  reviewee_id: string;
+  reviewee_name: string;
+  reviewee_role: string | null;
+  reviewee_department: string | null;
+  status: 'todo' | 'submitted' | string;
+  response_id: string | null;
+  reviewer_name: string | null;
+  submitted_at: string | null;
+  avg_score: number | null;
+  score_pct: number | null;
+};
+
+export async function fetchSharedEaQuarterly(
+  period: string = defaultQuarterPeriod(),
+): Promise<SharedEaQuarterlyRow[]> {
+  const { data, error } = await supabase.rpc('get_shared_ea_quarterly', { _period: period });
+  if (error || !Array.isArray(data)) return [];
+  return data as SharedEaQuarterlyRow[];
+}
+
 export async function fetchEaQuarterlyStatusRoster(
   period: string = defaultQuarterPeriod(),
 ): Promise<EaQuarterlyStatusRow[]> {

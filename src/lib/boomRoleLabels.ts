@@ -31,13 +31,13 @@ export function boomTasksIntro(level: number | null | undefined): string {
 export function boomFormPurpose(formCode: string): string {
   switch (formCode) {
     case 'executive':
-      return 'Quarterly Executive Performance self-assessment — private reflection about yourself (Uche, Gisele, Omotola, Deyi only).';
+      return 'Quarterly Executive Performance self-assessment — private reflection about yourself (Uche, Omotola, and Deyi only).';
     case 'peer_360':
       return '360 Peer review — anonymous feedback on every active EO colleague except yourself.';
     case 'monthly_self':
       return 'Private monthly reflection — only you and authorised admins see answers.';
     case 'ea_quarterly':
-      return 'Executive Office Quarterly Evaluation — only assigned line managers see these.';
+      return 'Executive Office Quarterly Evaluation — one appraisal per person each quarter. If another assigned manager already submitted it, you can view that appraisal and cannot file a second one.';
     case 'epa_gceo_assessor':
       return 'BOOM-EPA v2 GCEO assessor layer — rate L1 functional leads after they submit their executive self-assessment.';
     default:

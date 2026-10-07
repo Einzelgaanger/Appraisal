@@ -403,7 +403,7 @@ export default function BoomDiscussionsPanel({
         After monthly self check-ins and other assessments are submitted, routed discussions appear here.
         Peer 360 subjects can open a manager thread on released results. Each facilitator has a separate thread with the
         person who owns the results — e.g. a team member may have up to three monthly self threads (line manager, Bunmi,
-        Omotola). L1 line managers (Uche, Gisele, Omotola, Deyi) can review anonymous 360 results for their L2 pods;
+        Omotola). L1 line managers (Uche, Omotola, Deyi) can review anonymous 360 results for their L2 pods;
         executives (Bunmi) see L2 only — not L1 peers.
       </p>
 

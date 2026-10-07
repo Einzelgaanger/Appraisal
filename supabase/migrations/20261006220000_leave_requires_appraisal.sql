@@ -268,8 +268,8 @@ BEGIN
     ),
     'submit_open', CURRENT_DATE <= q_start + 13,
     'submit_deadline', q_start + 13,
-    'allowed_start', q_start + 14,
-    'allowed_end', q_end - 14,
+    'allowed_start', q_start,
+    'allowed_end', q_end,
     'quarter_start', q_start,
     'quarter_end', q_end,
     'appraisal_block', CASE WHEN me IS NULL THEN NULL ELSE public.workspace_appraisal_leave_block(me) END

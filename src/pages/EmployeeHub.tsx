@@ -56,9 +56,12 @@ import {
 import { defaultQuarterPeriod, resolveQuarterPeriod } from '@/lib/boomPeriods';
 import QuarterScoreHistory from '@/components/employee-dashboard/QuarterScoreHistory';
 import { fetchMyAggregatedPeer360Scores, fetchMy360Dashboard, fetchOrgPerformanceRankings, fetchGrowthHubPulse, buildBoomGrowthAiContext, type GrowthHubPulseMode } from '@/lib/boomDashboard360';
-import { fetchMyEaQuarterlyResults, type EaQuarterlyResults } from '@/lib/boomEaQuarterly';
+import { fetchMyEaQuarterlyResults, fetchSharedEaQuarterly, type EaQuarterlyResults, type SharedEaQuarterlyRow } from '@/lib/boomEaQuarterly';
 import { isMeaningfulQualitativeAnswer } from '@/lib/qualitativeFeedback';
 import EaQuarterlyDashboardCard from '@/components/employee-dashboard/EaQuarterlyDashboardCard';
+import SharedEaQuarterlyCard from '@/components/employee-dashboard/SharedEaQuarterlyCard';
+import AssessmentRunner from '@/components/boom/AssessmentRunner';
+import { boomHierarchyLabel } from '@/lib/boomRoleLabels';
 import { formatRoles, formatTeams } from '@/lib/personCoverage';
 import { isBoomTenant, isGhcStyleAppraisal } from '@/tenants/config';
 import { useTenant } from '@/tenants/TenantContext';
@@ -189,6 +192,9 @@ export default function EmployeeHub() {
   const [growthHubMode, setGrowthHubMode] = useState<GrowthHubPulseMode | null>(null);
   const [pulseLabel, setPulseLabel] = useState<string | null>(null);
   const [eaQuarterlyResults, setEaQuarterlyResults] = useState<EaQuarterlyResults | null>(null);
+  const [sharedEaQuarterly, setSharedEaQuarterly] = useState<SharedEaQuarterlyRow[]>([]);
+  const [sharedEaRunner, setSharedEaRunner] = useState<SharedEaQuarterlyRow | null>(null);
+  const [sharedEaRunnerOpen, setSharedEaRunnerOpen] = useState(false);
 
   // Growth Hub state
   const [selectedFocusArea, setSelectedFocusArea] = useState<string | null>(null);
@@ -272,6 +278,7 @@ export default function EmployeeHub() {
       setQualitativeFeedback({ startDoing: [], stopDoing: [], continueDoing: [] });
       setAiDataContext('');
       setEaQuarterlyResults(null);
+      setSharedEaQuarterly([]);
       setDashboardLoading(false);
       return;
     }
@@ -291,11 +298,16 @@ export default function EmployeeHub() {
     setBoom360Pending(null);
     setDashboardScoreSource('none');
     setEaQuarterlyResults(null);
+    setSharedEaQuarterly([]);
     try {
       const q = hubQuarter;
 
       if (boomMode) {
-        const eaResults = await fetchMyEaQuarterlyResults(q);
+        const [eaResults, sharedEa] = await Promise.all([
+          fetchMyEaQuarterlyResults(q),
+          fetchSharedEaQuarterly(q),
+        ]);
+        setSharedEaQuarterly(sharedEa);
         if (eaResults?.submissionCount) setEaQuarterlyResults(eaResults);
 
         const pulse = await fetchGrowthHubPulse(q);
@@ -1313,6 +1325,17 @@ export default function EmployeeHub() {
                     <EaQuarterlyDashboardCard results={eaQuarterlyResults} />
                   )}
 
+                  {boomMode && sharedEaQuarterly.length > 0 && currentEmployee && (
+                    <SharedEaQuarterlyCard
+                      rows={sharedEaQuarterly}
+                      period={hubQuarter}
+                      onOpen={(row) => {
+                        setSharedEaRunner(row);
+                        setSharedEaRunnerOpen(true);
+                      }}
+                    />
+                  )}
+
                   {myScores.length > 0 ? (
                     <>
                       {/* AI Insights Carousel */}
@@ -1761,6 +1784,25 @@ export default function EmployeeHub() {
         active={(activeTab as MobileTab) || 'survey'}
         onChange={(t) => setTab(t)}
       />
+
+      {boomMode && currentEmployee && sharedEaRunner && (
+        <AssessmentRunner
+          key={`${sharedEaRunner.reviewee_id}:${hubQuarter}`}
+          open={sharedEaRunnerOpen}
+          onOpenChange={setSharedEaRunnerOpen}
+          formCode="ea_quarterly"
+          formTitle="Executive Office Quarterly Evaluation"
+          revieweeId={sharedEaRunner.reviewee_id}
+          revieweeName={sharedEaRunner.reviewee_name}
+          period={hubQuarter}
+          reviewerEmployeeId={currentEmployee.id}
+          reviewerHierarchyLevel={currentEmployee.hierarchy_level}
+          reviewerRoleSummary={boomHierarchyLabel(currentEmployee.hierarchy_level)}
+          onCompleted={() => {
+            void fetchSharedEaQuarterly(hubQuarter).then(setSharedEaQuarterly);
+          }}
+        />
+      )}
     </div>
   );
 }
