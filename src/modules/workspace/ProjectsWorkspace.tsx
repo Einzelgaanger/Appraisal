@@ -44,6 +44,7 @@ import {
   companyDirectory,
   createProject,
   createTask,
+  getPlanner,
   setProjectPlan,
   delegateTask,
   getProject,
@@ -55,6 +56,7 @@ import {
   respondInvite,
   setTaskProgress,
   updateTask,
+  type PlannerKeyResult,
   type PlannerPriority,
   type PlannerStatus,
   type TaskCruciality,
@@ -247,7 +249,24 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
   const [newDue, setNewDue] = useState('');
   const [newPriority, setNewPriority] = useState<PlannerPriority>('medium');
   const [newStatus, setNewStatus] = useState<PlannerStatus>('not_started');
+  const [newKeyResultId, setNewKeyResultId] = useState('none');
+  const [keyResults, setKeyResults] = useState<PlannerKeyResult[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    let cancelled = false;
+    void getPlanner()
+      .then((board) => {
+        if (!cancelled) setKeyResults(board.key_results);
+      })
+      .catch(() => {
+        if (!cancelled) setKeyResults([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [createOpen]);
 
   const loadList = useCallback(async () => {
     const rows = await listProjects();
@@ -317,6 +336,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
         dueDate: newDue || null,
         priority: newPriority,
         status: newStatus,
+        keyResultId: newKeyResultId === 'none' ? null : newKeyResultId,
       });
       setCreateOpen(false);
       setNewName('');
@@ -324,6 +344,7 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
       setNewDue('');
       setNewPriority('medium');
       setNewStatus('not_started');
+      setNewKeyResultId('none');
       await loadList();
       onOpenProject(id);
       toast.success('Project created');
@@ -345,11 +366,12 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
 
   if (projectId) {
     return (
-      <ProjectDetail
+        <ProjectDetail
         employeeId={employeeId}
         detail={detail}
         loading={detailLoading}
         directory={directory}
+        projectChoices={projects.filter((row) => row.can_edit)}
         onBack={() => onOpenProject(null)}
         onReload={async () => {
           if (projectId) await loadDetail(projectId);
@@ -523,6 +545,23 @@ export default function ProjectsWorkspace({ employeeId, projectId, onOpenProject
               </div>
             </div>
             <div className="space-y-1.5">
+              <FieldLabel>Key result</FieldLabel>
+              <Select value={newKeyResultId} onValueChange={setNewKeyResultId}>
+                <SelectTrigger><SelectValue placeholder="Link to a key result" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No key result</SelectItem>
+                  {keyResults.map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.parent_title ? `${row.title} · ${row.parent_title}` : row.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {keyResults.length === 0 && (
+                <p className="text-xs text-muted-foreground">No key results in this company yet. You can still create the project and link it later.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
               <FieldLabel>Due date</FieldLabel>
               <Input type="date" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
             </div>
@@ -578,6 +617,7 @@ function ProjectDetail({
   detail,
   loading,
   directory,
+  projectChoices,
   onBack,
   onReload,
 }: {
@@ -585,6 +625,7 @@ function ProjectDetail({
   detail: WorkspaceProjectDetail | null;
   loading: boolean;
   directory: WorkspaceColleague[];
+  projectChoices: WorkspaceProjectListItem[];
   onBack: () => void;
   onReload: () => Promise<void>;
 }) {
@@ -595,6 +636,11 @@ function ProjectDetail({
   const [assigneeId, setAssigneeId] = useState(employeeId);
   const [taskDue, setTaskDue] = useState('');
   const [taskCruciality, setTaskCruciality] = useState<TaskCruciality>('medium');
+  const [taskProjectId, setTaskProjectId] = useState('');
+
+  useEffect(() => {
+    if (detail?.project.id) setTaskProjectId(detail.project.id);
+  }, [detail?.project.id]);
   const [invitee, setInvitee] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -610,12 +656,20 @@ function ProjectDetail({
     (person) => !detail?.members.some((m) => m.employee_id === person.id && m.status !== 'declined'),
   );
 
+  const taskProjects = useMemo(() => {
+    const rows = projectChoices.map((row) => ({ id: row.id, name: row.name }));
+    if (detail && !rows.some((row) => row.id === detail.project.id)) {
+      rows.unshift({ id: detail.project.id, name: detail.project.name });
+    }
+    return rows;
+  }, [detail, projectChoices]);
+
   const handleCreateTask = async () => {
-    if (!detail || !title.trim()) return;
+    if (!detail || !title.trim() || !taskProjectId) return;
     setBusy(true);
     try {
       await createTask({
-        projectId: detail.project.id,
+        projectId: taskProjectId,
         title: title.trim(),
         notes: notes.trim() || undefined,
         assigneeId,
@@ -628,8 +682,9 @@ function ProjectDetail({
       setTaskDue('');
       setTaskCruciality('medium');
       setAssigneeId(employeeId);
+      const linkedName = taskProjects.find((row) => row.id === taskProjectId)?.name;
       await onReload();
-      toast.success('Task added');
+      toast.success(taskProjectId === detail.project.id || !linkedName ? 'Task added' : `Task added to ${linkedName}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not add task');
     } finally {
@@ -820,7 +875,7 @@ function ProjectDetail({
                   <h3 className="font-display mt-1 text-lg font-medium tracking-tight">Tasks</h3>
                 </div>
                 {canEdit && (
-                  <Button size="sm" className="gap-1.5" onClick={() => setTaskOpen(true)}>
+                  <Button size="sm" className="gap-1.5" onClick={() => { setTaskProjectId(detail.project.id); setTaskOpen(true); }}>
                     <Plus className="h-3.5 w-3.5" /> Task
                   </Button>
                 )}
@@ -911,6 +966,17 @@ function ProjectDetail({
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
+              <FieldLabel>Project</FieldLabel>
+              <Select value={taskProjectId} onValueChange={setTaskProjectId}>
+                <SelectTrigger><SelectValue placeholder="Link to a project" /></SelectTrigger>
+                <SelectContent>
+                  {taskProjects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <FieldLabel>Title</FieldLabel>
               <Input placeholder="What needs to be done" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
@@ -949,7 +1015,7 @@ function ProjectDetail({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTaskOpen(false)}>Cancel</Button>
-            <Button disabled={busy || !title.trim()} onClick={() => void handleCreateTask()}>Add task</Button>
+            <Button disabled={busy || !title.trim() || !taskProjectId} onClick={() => void handleCreateTask()}>Add task</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

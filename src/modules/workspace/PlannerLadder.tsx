@@ -754,14 +754,17 @@ export default function PlannerLadder({
               <p className="text-sm text-muted-foreground">Add a project first. Tasks sit on a project you can edit.</p>
             ) : (
               <>
-                <Select value={taskProjectId} onValueChange={setTaskProjectId}>
-                  <SelectTrigger><SelectValue placeholder="Project" /></SelectTrigger>
-                  <SelectContent>
-                    {editableProjects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Project</p>
+                  <Select value={taskProjectId} onValueChange={setTaskProjectId}>
+                    <SelectTrigger><SelectValue placeholder="Link to a project" /></SelectTrigger>
+                    <SelectContent>
+                      {editableProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Input placeholder="What needs to be done" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
                 <Input type="date" value={taskDue} onChange={(event) => setTaskDue(event.target.value)} />
               </>

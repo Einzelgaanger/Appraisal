@@ -189,6 +189,7 @@ export async function createProject(payload: {
   dueDate?: string | null;
   priority?: PlannerPriority;
   status?: PlannerStatus;
+  keyResultId?: string | null;
 }): Promise<string> {
   const { data, error } = await db.rpc('workspace_create_project', {
     _name: payload.name,
@@ -197,6 +198,9 @@ export async function createProject(payload: {
   });
   if (error) rpcError(error);
   const id = data as string;
+  if (payload.keyResultId) {
+    await setProjectKeyResult(id, payload.keyResultId);
+  }
   if (payload.priority || payload.status) {
     await setProjectPlan(id, payload.priority ?? 'medium', payload.status ?? 'not_started');
   }
